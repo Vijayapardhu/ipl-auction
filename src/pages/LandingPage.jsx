@@ -1038,9 +1038,7 @@ const LandingPage = () => {
         {/* ─── Franchises ─── */}
         <motion.section variants={itemVariants} className="max-w-6xl mx-auto px-4 mt-16">
           <div className="flex items-center justify-center gap-4 mb-2">
-            <div className="h-px w-12 bg-white/10" />
             <span className="text-[10px] font-black text-gray-600 uppercase tracking-[0.4em]">Official Franchises</span>
-            <div className="h-px w-12 bg-white/10" />
           </div>
           <LogoMarquee />
         </motion.section>
