@@ -786,43 +786,88 @@ export const AuctionProvider = ({ children }) => {
     let finalAmount = amount;
 
     const liveRef = ref(rtdb, `auctions/${currentAuction.id}/live`);
-    const txResult = await runTransactionRtdb(liveRef, (currentData) => {
-      if (!currentData) return currentData;
-      if (currentData.status !== 'bidding') return; // abort
-      if (currentData.highBidderId === user.uid) return; // abort
-      
-      const cBid = currentData.currentBid || 0;
-      const inc = cBid < 5 ? 0.20 : 0.25;
-      const nAmount = cBid === 0 ? IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0 : cBid + inc;
-      
-      if (team.budgetRemaining < nAmount) return; // abort
+    // Transport retry: on flaky networks the transaction itself can fail
+    // with a network/disconnect error (distinct from a clean abort, which
+    // returns committed:false). One retry before surfacing.
+    let txResult = null;
+    let transportErr = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        txResult = await runTransactionRtdb(liveRef, (currentData) => {
+          if (!currentData) return currentData;
+          if (currentData.status !== 'bidding') return; // abort
+          if (currentData.highBidderId === user.uid) return; // abort
 
-      finalAmount = nAmount;
-      currentData.currentBid = nAmount;
-      currentData.highBidderId = user.uid;
-      currentData.highBidderName = user.displayName || 'Manager';
-      currentData.highBidderTeamId = team.teamId;
-      currentData.timerEndsAt = getSyncedTime() + (currentAuction.settings?.bidTimer || 10) * 1000;
-      
-      return currentData;
-    });
+          const cBid = currentData.currentBid || 0;
+          const inc = cBid < 5 ? 0.20 : 0.25;
+          const nAmount = cBid === 0 ? IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0 : cBid + inc;
+
+          if (team.budgetRemaining < nAmount) return; // abort
+
+          finalAmount = nAmount;
+          currentData.currentBid = nAmount;
+          currentData.highBidderId = user.uid;
+          currentData.highBidderName = user.displayName || 'Manager';
+          currentData.highBidderTeamId = team.teamId;
+          currentData.timerEndsAt = getSyncedTime() + (currentAuction.settings?.bidTimer || 10) * 1000;
+
+          return currentData;
+        });
+        transportErr = null;
+        break;
+      } catch (err) {
+        transportErr = err;
+        if (!/network|disconnect|timeout|unavailable|failed to get/i.test(err?.message || '')) throw err;
+        await new Promise((res) => setTimeout(res, 500));
+      }
+    }
+    if (transportErr) throw transportErr;
 
     // On slow networks the room often moves before our bid lands (outbid,
     // timer ended, overspent). The transaction aborts — do NOT log a phantom
-    // "New bid", just tell the user to bid fresh.
+    // "New bid". Diagnose precisely so the message tells the truth.
     if (!txResult || !txResult.committed) {
+      let fresh = null;
+      try {
+        const freshSnap = await get(liveRef);
+        fresh = freshSnap.exists() ? freshSnap.val() : null;
+      } catch (e) { /* fall through to generic */ }
+      if (fresh) {
+        if (fresh.status !== 'bidding') {
+          throw new Error(fresh.status === 'paused' ? 'Auction is paused.' : 'Too late! The hammer has fallen.');
+        }
+        if (fresh.highBidderId === user.uid) {
+          // Our bid actually landed (commit response was lost in a retry):
+          // we're already top, nothing left to do.
+          return finalAmount;
+        }
+        try {
+          const teamSnap = await get(ref(rtdb, `auctions/${currentAuction.id}/teams/${currentAuction.id}_${user.uid}`));
+          if (teamSnap.exists()) {
+            const need = (fresh.currentBid || 0) + 0.25;
+            if ((teamSnap.val().budgetRemaining ?? Infinity) < need) {
+              throw new Error(`Insufficient budget — you need ₹${need.toFixed(2)} Cr for the next bid.`);
+            }
+          }
+        } catch (e) {
+          if (e.message.startsWith('Insufficient budget')) throw e;
+        }
+      }
       throw new Error('Outbid! The price moved — place a fresh bid.');
     }
 
-    // Add to messages collection for chronological sorting
+    // Add to messages collection for chronological sorting.
+    // Fire-and-forget: the bid is already committed above, so the button
+    // must not wait another round trip just for the cosmetic feed log —
+    // this is what makes bids feel instant on slow networks.
     const msgRef = ref(rtdb, `auctions/${currentAuction.id}/messages`);
-    await push(msgRef, {
+    push(msgRef, {
       userId: 'system',
       userName: 'System',
       text: `New bid: ₹${finalAmount.toFixed(2)} Cr by ${user.displayName || 'Manager'} (${team.teamId})`,
       type: 'log',
       timestamp: serverTimestampRtdb()
-    });
+    }).catch(() => {});
   }, [currentAuction, user, team, isOnline]);
 
   const updatePlayerTeam = useCallback(async (roomId, userId, newTeamId) => {

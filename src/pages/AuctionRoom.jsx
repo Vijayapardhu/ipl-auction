@@ -658,10 +658,17 @@ const AuctionRoom = () => {
        };
     }, []);
 
-   const isAdmin = currentAuction?.hostId === user?.uid;
-   const currentBid = displayAuctionState?.currentBid || 0;
-   const increment = currentBid < 5 ? 0.20 : 0.25;
-   const nextBidAmount = currentBid === 0 ? (currentPlayer?.basePrice || 0) : currentBid + increment;
+    // Hammer grace: after the timer hits 0, late bids still land for this
+    // long before the hammer falls. Covers last-second bids + slow networks.
+    const HAMMER_GRACE_MS = 2000;
+    const isAdmin = currentAuction?.hostId === user?.uid;    const currentBid = displayAuctionState?.currentBid || 0;
+    const increment = currentBid < 5 ? 0.20 : 0.25;
+    const nextBidAmount = currentBid === 0 ? (currentPlayer?.basePrice || 0) : currentBid + increment;
+    // Bid window stays open through the hammer grace period (no re-render
+    // fires during grace, so this must be deadline-based, not timeLeft-based).
+    const bidWindowClosed =
+       displayAuctionState?.status !== 'bidding' ||
+       (displayAuctionState?.timerEndsAt ?? 0) + HAMMER_GRACE_MS - getSyncedTime() <= 0;
    const playerCategories = useMemo(() => {
       const soldIds = new Set();
       const soldWithBids = {};
@@ -945,10 +952,10 @@ const AuctionRoom = () => {
 
 
 
-   const lastBeepedSecRef = useRef(-1);
-   const endTriggeredRef = useRef(false);
+    const lastBeepedSecRef = useRef(-1);
+    const endTriggeredRef = useRef(false);
 
-   // Reset the end-trigger lock whenever a new player starts or timer resets (new bid)
+    // Reset the end-trigger lock whenever a new player starts or timer resets (new bid)
    useEffect(() => {
       endTriggeredRef.current = false;
    }, [displayAuctionState?.playerId, displayAuctionState?.timerEndsAt]);
@@ -961,24 +968,27 @@ const AuctionRoom = () => {
       // Reset beep tracking when timer resets (new bid / new player)
       lastBeepedSecRef.current = -1;
 
-      const interval = setInterval(() => {
-         const rawMs = displayAuctionState.timerEndsAt - getSyncedTime();
-         const diff = Math.max(0, Math.ceil(rawMs / 1000));
+       const interval = setInterval(() => {
+          const rawMs = displayAuctionState.timerEndsAt - getSyncedTime();
+          const diff = Math.max(0, Math.ceil(rawMs / 1000));
 
-         if (diff <= 5 && diff > 0 && diff !== lastBeepedSecRef.current) {
-            lastBeepedSecRef.current = diff;
-            playBeep(diff === 1 ? 880 : 440, 0.1);
-         }
+          if (diff <= 5 && diff > 0 && diff !== lastBeepedSecRef.current) {
+             lastBeepedSecRef.current = diff;
+             playBeep(diff === 1 ? 880 : 440, 0.1);
+          }
 
           setTimeLeft(prev => (prev === diff ? prev : diff));
-         if (diff === 0) {
-            clearInterval(interval);
-            if (isAdmin && displayAuctionState.status === 'bidding' && !endTriggeredRef.current) {
-               endTriggeredRef.current = true;
-               endPlayerAuction(id);
-            }
-         }
-      }, 200);
+          // Grace window: bids landing just after 0 still count. Only end
+          // once we're GRACE_MS past expiry with no fresh bid extending it
+          // (any bid resets timerEndsAt, which restarts this effect).
+          if (rawMs <= -HAMMER_GRACE_MS) {
+             clearInterval(interval);
+             if (isAdmin && displayAuctionState.status === 'bidding' && !endTriggeredRef.current) {
+                endTriggeredRef.current = true;
+                endPlayerAuction(id);
+             }
+          }
+       }, 200);
 
       return () => clearInterval(interval);
     }, [displayAuctionState?.timerEndsAt, displayAuctionState?.status, currentAuction?.status, isAdmin, id, endPlayerAuction, getSyncedTime]);
@@ -996,7 +1006,9 @@ const AuctionRoom = () => {
        const watchdog = setInterval(() => {
           if (st === 'bidding') {
              const endsAt = displayAuctionState?.timerEndsAt;
-             if (endsAt && getSyncedTime() - endsAt > 4000) {
+             // Past the hammer grace window + margin: the normal end path
+             // never got there, so force it (fenced server-side).
+             if (endsAt && getSyncedTime() - endsAt > HAMMER_GRACE_MS + 4500) {
                 endTriggeredRef.current = false;
                 endPlayerAuction(id);
              }
@@ -1021,6 +1033,8 @@ const AuctionRoom = () => {
        // In-flight lock: on slow networks double-taps would otherwise fire
        // two sequential transactions and make you outbid yourself.
        if (isBidding) return;
+       // Hard stop past the hammer grace (button gates this too).
+       if (bidWindowClosed) return;
 
       // Budget Guard
       if ((team?.budgetRemaining || 0) < nextBidAmount) {
@@ -1666,7 +1680,7 @@ const AuctionRoom = () => {
                                   <div className="bg-black/20 border-t border-white/5 p-3 sm:p-4 md:p-6 flex gap-3 md:gap-4">
                                      <button
                                         onClick={handleBid}
-                                        disabled={timeLeft === 0 || isBidding || !isOnline || displayAuctionState?.status !== 'bidding' || displayAuctionState?.highBidderId === user?.uid}
+                                        disabled={bidWindowClosed || isBidding || !isOnline || displayAuctionState?.highBidderId === user?.uid}
                                         className={`flex-1 h-14 md:h-16 font-black text-[15px] sm:text-base md:text-xl leading-tight px-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:opacity-50 disabled:grayscale cursor-pointer ${displayAuctionState?.highBidderId === user?.uid
                                            ? 'bg-white/5 text-green-500 border border-green-500/20 shadow-inner'
                                            : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-[#050505] shadow-[0_4px_20px_rgba(34,197,94,0.2)] hover:shadow-[0_8px_30px_rgba(34,197,94,0.3)]'
@@ -1838,6 +1852,7 @@ const AuctionRoom = () => {
                                highBidderTeamId={displayAuctionState?.highBidderTeamId}
                                nextBidAmount={nextBidAmount}
                                timeLeft={timeLeft}
+                               bidClosed={bidWindowClosed}
                                status={displayAuctionState?.status}
                                isBidding={isBidding}
                                isOnline={isOnline}

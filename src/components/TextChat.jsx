@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { rtdb } from '../lib/firebase';
 import { ref, set, remove, onValue, onDisconnect } from 'firebase/database';
 import { TEAMS } from '../data/teams';
-import { Send, MessageSquare, ChevronUp, ChevronDown, ArrowDown, Image as ImageIcon } from 'lucide-react';
+import { Send, MessageSquare, ChevronUp, ChevronDown, ArrowDown, RotateCcw, Loader2, Image as ImageIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 
@@ -20,13 +20,15 @@ const formatTime = (ts) => {
    }
 };
 
-const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
-   const { messages, sendMessage, toggleReaction } = useAuction();
+const TextChat = ({ roomId, isCollapsed, onToggleCollapse, autoFocusInput }) => {
+   const { messages, sendMessage, toggleReaction, isOnline } = useAuction();
    const { user } = useAuth();
    const [text, setText] = useState('');
    const [typingUsers, setTypingUsers] = useState([]);
    const [reactFor, setReactFor] = useState(null);
    const [showJump, setShowJump] = useState(false);
+   const [sending, setSending] = useState(false);
+   const [sendError, setSendError] = useState('');
    const scrollContainerRef = useRef(null);
    const stickRef = useRef(true);
    const typingTimerRef = useRef(null);
@@ -90,6 +92,7 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
 
    const handleTyping = (val) => {
       setText(val);
+      if (sendError) setSendError('');
       if (!roomId || !user?.uid) return;
       const meRef = ref(rtdb, `auctions/${roomId}/typing/${user.uid}`);
       if (val.trim()) {
@@ -106,18 +109,42 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
    };
 
    const handleSend = async (e) => {
-      e.preventDefault();
-      if (!text.trim() || !roomId) return;
+      if (e) e.preventDefault();
+      if (!text.trim() || !roomId || sending) return;
 
+      // Double-tap lock: the in-flight message stays in the box until the
+      // server acks, so laggy networks can never duplicate it.
+      setSending(true);
+      setSendError('');
+      const payload = text.trim();
       try {
-         await sendMessage(roomId, text.trim(), 'text');
+         await sendMessage(roomId, payload, 'text');
          setText('');
          if (user?.uid) {
             remove(ref(rtdb, `auctions/${roomId}/typing/${user.uid}`)).catch(() => {});
          }
          scrollToBottom(true);
       } catch (err) {
-         // Send failed silently or handled by context
+         // Kept in the box with a retry affordance — never silently dropped.
+         setSendError(isOnline === false ? 'Offline — will send on reconnect. Retry now?' : 'Send failed. Retry?');
+      } finally {
+         setSending(false);
+      }
+   };
+
+   const handleGifSend = async (gifUrl) => {
+      if (!roomId || sending) return;
+      setSending(true);
+      setSendError('');
+      try {
+         await sendMessage(roomId, gifUrl, 'gif');
+         setShowGifPicker(false);
+         setGifSearchQuery('');
+         scrollToBottom(true);
+      } catch (err) {
+         setSendError('GIF failed to send. Retry?');
+      } finally {
+         setSending(false);
       }
    };
 
@@ -189,7 +216,7 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                <div
                   ref={scrollContainerRef}
                   onScroll={handleScroll}
-                  className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-3 custom-scrollbar flex flex-col min-h-0"
+                  className="flex-1 overflow-y-auto overscroll-contain p-4 custom-scrollbar flex flex-col min-h-0"
                   style={{ WebkitOverflowScrolling: 'touch' }}
                >
                   {chatMessages.length === 0 ? (
@@ -201,6 +228,13 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                   ) : (
                      chatMessages.map((msg, index) => {
                         const isMe = msg.userId === user?.uid;
+                        // Group consecutive messages: repeat the name header
+                        // only when the sender changes (or after a 2-min gap),
+                        // like real chat apps.
+                        const prev = chatMessages[index - 1];
+                        const sameSender = prev && prev.userId === msg.userId;
+                        const gapMs = (msg.timestamp || 0) - ((prev && prev.timestamp) || 0);
+                        const showHeader = !isMe && (!sameSender || gapMs > 120000);
 
                         // Find bidder's team logo
                         const userTeamLogo = TEAMS.find(t => t.id === msg.teamId || t.name === msg.teamId)?.logo;
@@ -213,10 +247,10 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                               key={msg.id || index}
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
-                              className={`flex flex-col min-w-0 ${isMe ? 'items-end' : 'items-start'} max-w-[85%] ${isMe ? 'ml-auto' : 'mr-auto'}`}
+                              className={`flex flex-col min-w-0 ${isMe ? 'items-end' : 'items-start'} max-w-[85%] ${isMe ? 'ml-auto' : 'mr-auto'} ${index === 0 ? '' : sameSender ? 'mt-1' : 'mt-3'}`}
                            >
-                              {/* Name and Team Header (only for other users) */}
-                              {!isMe && (
+                              {/* Name and Team Header (only for other users, grouped) */}
+                              {showHeader && (
                                  <div className="flex items-center gap-1.5 mb-1 px-1">
                                     <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tight">
                                        {msg.userName}
@@ -334,6 +368,23 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                   </div>
                )}
 
+               {/* Send status: errors retry, offline warns (queue still syncs) */}
+               {sendError ? (
+                  <button
+                     type="button"
+                     onClick={handleSend}
+                     className="mx-3 mb-2 flex items-center justify-center gap-1.5 bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2 text-[9px] font-black text-red-400 uppercase tracking-widest transition-all active:scale-[0.98] cursor-pointer"
+                  >
+                     <RotateCcw size={11} /> {sendError} Tap to retry
+                  </button>
+               ) : (
+                  isOnline === false && (
+                     <p className="mx-3 mb-2 text-center text-[8px] font-black text-amber-400/80 uppercase tracking-widest">
+                        Offline — messages send on reconnect
+                     </p>
+                  )
+               )}
+
                {/* Message Input Box — pinned, never pushed out by bubbles */}
                <form onSubmit={handleSend} className="p-3 border-t border-white/5 bg-[#0c0c0c] flex gap-2 relative z-10 shrink-0 sticky bottom-0">
                   <button
@@ -349,15 +400,16 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                      value={text}
                      onChange={(e) => handleTyping(e.target.value)}
                      placeholder="Type a message..."
+                     autoFocus={!!autoFocusInput}
                      className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-[11px] text-white focus:outline-none focus:border-white/30 transition-colors placeholder:text-gray-700"
                      maxLength={150}
                   />
                   <button
                      type="submit"
-                     disabled={!text.trim()}
+                     disabled={!text.trim() || sending}
                      className="w-10 h-10 bg-white disabled:opacity-40 hover:bg-white/90 text-black rounded-xl flex items-center justify-center transition-all active:scale-95 disabled:scale-100 cursor-pointer shrink-0"
                   >
-                     <Send size={14} fill="currentColor" />
+                     {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} fill="currentColor" />}
                   </button>
                </form>
 
@@ -408,13 +460,7 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                               <button
                                  key={gif.id}
                                  type="button"
-                                 onClick={async () => {
-                                    try {
-                                       await sendMessage(roomId, gif.url, 'gif');
-                                       setShowGifPicker(false);
-                                       setGifSearchQuery('');
-                                    } catch (e) {}
-                                 }}
+                                 onClick={() => handleGifSend(gif.url)}
                                  className="relative rounded-lg overflow-hidden border border-white/5 hover:border-white/30 aspect-video group cursor-pointer transition-all active:scale-95 bg-white/5"
                               >
                                  <img src={gif.url} alt={gif.name} loading="lazy" className="w-full h-full object-cover" />

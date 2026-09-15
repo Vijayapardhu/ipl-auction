@@ -13,6 +13,7 @@ const AuctionMiniBar = ({
   highBidderTeamId,
   nextBidAmount,
   timeLeft,
+  bidClosed,
   status,
   isBidding,
   isOnline,
@@ -71,7 +72,7 @@ const AuctionMiniBar = ({
       </div>
       <button
         onClick={onBid}
-        disabled={!biddingLive || timeLeft === 0 || isBidding || !isOnline || isLeading}
+        disabled={bidClosed || isBidding || !isOnline || isLeading}
         className={`mt-2.5 w-full h-11 rounded-xl font-black text-xs uppercase tracking-[0.2em] transition-all active:scale-[0.98] disabled:opacity-50 disabled:grayscale cursor-pointer flex items-center justify-center gap-2 ${isLeading
           ? 'bg-white/5 text-green-500 border border-green-500/20'
           : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-[#050505] shadow-[0_4px_20px_rgba(34,197,94,0.2)]'}`}

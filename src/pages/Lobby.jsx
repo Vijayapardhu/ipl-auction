@@ -626,9 +626,9 @@ const Lobby = () => {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="h-[400px]"
-                  >
-                    <TextChat roomId={id} />
+                     className="h-[400px] flex flex-col min-h-0"
+                   >
+                     <TextChat roomId={id} />
                   </motion.div>
                 )}
               </AnimatePresence>

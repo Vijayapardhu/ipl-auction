@@ -48,7 +48,7 @@ const MiniChat = ({ roomId, open, setOpen, unread, hidden }) => {
                   <X size={16} />
                 </button>
               </div>
-              <TextChat roomId={roomId} />
+              <TextChat roomId={roomId} autoFocusInput />
             </div>
           </motion.div>
         )}
