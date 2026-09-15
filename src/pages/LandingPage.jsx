@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useAuction } from '../contexts/AuctionContext';
 import { getDb, getFs } from '../lib/firebase';
-import { IPL_PLAYERS } from '../data/players';
+import { getPlayers } from '../lib/players';
 import { TEAMS } from '../data/teams';
 import {
   Zap,
@@ -149,9 +149,10 @@ const LandingPage = () => {
     const fetchHistory = async () => {
       setHistoryLoading(true);
       try {
-        // Firestore loads here (history tab only) — never on first paint.
+        // Firestore + player data load here (history tab only) — never on first paint.
         const { collection, query, where, getDocs, documentId } = await getFs();
         const db = await getDb();
+        const IPL_PLAYERS = await getPlayers();
         const teamsQuery = query(
           collection(db, 'teams'),
           where('userId', '==', user.uid)
@@ -775,7 +776,7 @@ const LandingPage = () => {
                           const overseasCount = session.squad.filter(p => p?.country !== 'IND').length;
 
                           return (
-                            <div key={session.id} className="space-y-1">
+                            <div key={session.id} className="space-y-1 cv-auto">
                               <button
                                 onClick={() => setExpandedSession(isExpanded ? null : session.id)}
                                 className={`w-full text-left p-3 sm:p-4 rounded-2xl border transition-all flex items-center justify-between group cursor-pointer ${isExpanded ? 'bg-white/10 border-white/20 shadow-lg' : 'bg-white/[0.03] border-white/5 hover:bg-white/5'

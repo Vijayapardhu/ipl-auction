@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { getDb, getFs, getServerTime, rtdb } from '../lib/firebase';
-import { IPL_PLAYERS } from '../data/players';
+import { getPlayers } from '../lib/players';
 import {
   ref,
   set,
@@ -182,6 +182,8 @@ export const AuctionProvider = ({ children }) => {
   }, []);
 
   const startAuction = useCallback(async (roomId) => {
+    // Player data loads on first auction start — long after first paint.
+    const IPL_PLAYERS = await getPlayers();
     // Generate randomized order within sets
     const sets = [...new Set(IPL_PLAYERS.map(p => p.set))];
     let randomizedIndices = [];
@@ -232,6 +234,7 @@ export const AuctionProvider = ({ children }) => {
       if (!live || live.playerId !== ended?.playerId) return;
       if (live.status !== ended?.status || (live.status !== 'sold' && live.status !== 'unsold')) return;
 
+      const IPL_PLAYERS = await getPlayers();
       const roomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
       const roomData = roomSnap.exists() ? roomSnap.val() : {};
       if (roomData.status !== 'active') return;
@@ -296,6 +299,7 @@ export const AuctionProvider = ({ children }) => {
 
       const auctionState = txResult.snapshot.val();
       const isSold = auctionState.status === 'sold';
+      const IPL_PLAYERS = await getPlayers();
       const player = IPL_PLAYERS.find(p => p.id === auctionState.playerId);
       const teamDetails = TEAMS.find(t => t.id === auctionState.highBidderTeamId);
 
@@ -734,7 +738,10 @@ export const AuctionProvider = ({ children }) => {
     }
     if (currentAuction.currentAuction?.status !== 'bidding') throw new Error("Auction is not accepting bids right now.");
     if (currentAuction.currentAuction?.highBidderId === user.uid) throw new Error("You are already the highest bidder!");
-    
+
+    // Player data loads on first bid — cached for the rest of the session.
+    const IPL_PLAYERS = await getPlayers();
+
     // Squad limit check
     const squadLimit = currentAuction.squadLimit || 25;
     if (team.squad && team.squad.length >= squadLimit) {

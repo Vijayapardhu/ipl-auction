@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { IPL_PLAYERS } from '../data/players';
+import { getPlayers } from '../lib/players';
 import { TEAMS } from '../data/teams';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -18,12 +18,12 @@ const getShortName = (name) => {
   return name;
 };
 
-const generateMockNotification = (existingIds = new Set()) => {
+const generateMockNotification = (playerPool, existingIds = new Set()) => {
   // 1. Pick a random player
-  let player = IPL_PLAYERS[Math.floor(Math.random() * IPL_PLAYERS.length)];
+  let player = playerPool[Math.floor(Math.random() * playerPool.length)];
   let attempts = 0;
   while (existingIds.has(player.id) && attempts < 5) {
-    player = IPL_PLAYERS[Math.floor(Math.random() * IPL_PLAYERS.length)];
+    player = playerPool[Math.floor(Math.random() * playerPool.length)];
     attempts++;
   }
 
@@ -56,29 +56,41 @@ export default function AuctionActivityFeed() {
   const [notifications, setNotifications] = useState([]);
   const [activeCount, setActiveCount] = useState(18);
 
-  // Initialize with 8 historical notifications to fill the height
+  // Initialize with 8 historical notifications to fill the height.
+  // Player data loads on demand so the landing first paint stays light.
   useEffect(() => {
-    const initial = [];
-    const usedIds = new Set();
-    for (let i = 0; i < 8; i++) {
-      const mock = generateMockNotification(usedIds);
-      usedIds.add(mock.player.id);
-      initial.push(mock);
-    }
-    setNotifications(initial);
+    let live = true;
+    (async () => {
+      try {
+        const pool = await getPlayers();
+        if (!live) return;
+        const initial = [];
+        const usedIds = new Set();
+        for (let i = 0; i < 8; i++) {
+          const mock = generateMockNotification(pool, usedIds);
+          usedIds.add(mock.player.id);
+          initial.push(mock);
+        }
+        setNotifications(initial);
+      } catch (e) { /* feed stays empty offline */ }
+    })();
+    return () => { live = false; };
   }, []);
 
   // Dynamic timeout to push a new notification at variable intervals (2s to 10s)
   useEffect(() => {
     let timeoutId;
 
-    const pushNotification = () => {
-      setNotifications(prev => {
-        const usedIds = new Set(prev.map(n => n.player.id));
-        const newNotification = generateMockNotification(usedIds);
-        // Add to top, keep maximum 9 notifications in memory
-        return [newNotification, ...prev.slice(0, 8)];
-      });
+    const pushNotification = async () => {
+      try {
+        const pool = await getPlayers();
+        setNotifications(prev => {
+          const usedIds = new Set(prev.map(n => n.player.id));
+          const newNotification = generateMockNotification(pool, usedIds);
+          // Add to top, keep maximum 9 notifications in memory
+          return [newNotification, ...prev.slice(0, 8)];
+        });
+      } catch (e) { /* skip this tick offline */ }
 
       // Generate a random delay between 2000ms (2s) and 10000ms (10s)
       const randomDelay = Math.floor(Math.random() * 8000) + 2000;
