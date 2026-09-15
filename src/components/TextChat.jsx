@@ -136,10 +136,15 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
          const res = await fetch(url);
          const json = await res.json();
          if (json && json.data) {
+            // Small renditions: bubbles are ≤200px wide, so the multi-MB
+            // fixed_height originals would only burn mobile data.
             const list = json.data.map(item => ({
                id: item.id,
                name: item.title || 'GIF',
-               url: item.images?.fixed_height?.url || item.images?.original?.url
+               url: item.images?.fixed_height_small?.url
+                 || item.images?.downsized?.url
+                 || item.images?.fixed_height?.url
+                 || item.images?.original?.url
             }));
             setSearchedGifs(list);
          } else {

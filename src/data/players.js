@@ -25,7 +25,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 2,
     "set": "Marquee Set 1",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/415500/415592.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/415500/415592.jpg",
     "stats": {
       "matches": 165,
       "runs": 4912,
@@ -169,7 +169,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 2,
     "set": "Marquee Set 1",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/0/01/Jos_Buttler_in_2023.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Jos_Buttler_in_2023.jpg/320px-Jos_Buttler_in_2023.jpg",
     "stats": {
       "matches": 107,
       "runs": 5795,
@@ -313,7 +313,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 2,
     "set": "Marquee Set 1",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/0/01/Mohammed_Shami_Arjuna_Award_%28cropped%29.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Mohammed_Shami_Arjuna_Award_%28cropped%29.jpg/320px-Mohammed_Shami_Arjuna_Award_%28cropped%29.jpg",
     "stats": {
       "matches": 124,
       "wickets": 172,
@@ -403,7 +403,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 2,
     "set": "Marquee Set 1",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/417500/417526.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/417500/417526.jpg",
     "stats": {
       "matches": 221,
       "wickets": 193,
@@ -529,7 +529,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 2,
     "set": "Marquee Set 1",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/2/27/Ruturaj_Gaikwad.jpeg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/Ruturaj_Gaikwad.jpeg/320px-Ruturaj_Gaikwad.jpeg",
     "stats": {
       "matches": 156,
       "runs": 4233,
@@ -655,7 +655,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 2,
     "set": "Marquee Set 1",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/415900/415979.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/415900/415979.jpg",
     "stats": {
       "matches": 222,
       "runs": 3214,
@@ -781,7 +781,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 2,
     "set": "Set 1",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/1/1d/Lockie_Ferguson.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Lockie_Ferguson.jpg/320px-Lockie_Ferguson.jpg",
     "stats": {
       "matches": 204,
       "wickets": 188,
@@ -853,7 +853,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 2,
     "set": "Set 1",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/416900/416996.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/416900/416996.jpg",
     "stats": {
       "matches": 191,
       "runs": 5013,
@@ -907,7 +907,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 2,
     "set": "Set 1",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/8/89/Jake_Fraser_McGurk_2024_clip.png",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Jake_Fraser_McGurk_2024_clip.png/320px-Jake_Fraser_McGurk_2024_clip.png",
     "stats": {
       "matches": 167,
       "runs": 3517,
@@ -1105,7 +1105,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 2,
     "set": "Set 1",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/412800/412865.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/412800/412865.jpg",
     "stats": {
       "matches": 244,
       "wickets": 188,
@@ -1285,7 +1285,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 2,
     "set": "Set 2",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/416700/416748.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/416700/416748.jpg",
     "stats": {
       "matches": 135,
       "runs": 4642,
@@ -1303,7 +1303,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 1.5,
     "set": "Set 2",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/418200/418223.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/418200/418223.jpg",
     "stats": {
       "matches": 55,
       "runs": 2036,
@@ -1447,7 +1447,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 1,
     "set": "Set 2",
-    "image": "https://www.lucknowsupergiants.in/static-assets/waf-images/c8/4a/15/16-9/HPXdCAZZjc.JPG?v=1.11&w=1200",
+    "image": "https://www.lucknowsupergiants.in/static-assets/waf-images/c8/4a/15/16-9/HPXdCAZZjc.JPG?v=1.11&w=400",
     "stats": {
       "matches": 101,
       "wickets": 53,
@@ -1465,7 +1465,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 1,
     "set": "Set 2",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/416000/416080.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/416000/416080.jpg",
     "stats": {
       "matches": 89,
       "runs": 2514,
@@ -1591,7 +1591,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 2,
     "set": "Set 2",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/413700/413768.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/413700/413768.jpg",
     "stats": {
       "matches": 179,
       "wickets": 128,
@@ -1609,7 +1609,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 2,
     "set": "Set 2",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/417200/417206.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/417200/417206.jpg",
     "stats": {
       "matches": 244,
       "wickets": 103,
@@ -1645,7 +1645,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 1,
     "set": "Set 2",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/339300/339303.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/339300/339303.jpg",
     "stats": {
       "matches": 101,
       "wickets": 51,
@@ -1699,7 +1699,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.75,
     "set": "Set 2",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/416100/416152.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/416100/416152.jpg",
     "stats": {
       "matches": 55,
       "runs": 663,
@@ -1753,7 +1753,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.3,
     "set": "Set 2",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/400300/400306.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/400300/400306.jpg",
     "stats": {
       "matches": 62,
       "wickets": 16,
@@ -1843,7 +1843,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.5,
     "set": "Set 2",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/411800/411863.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/411800/411863.jpg",
     "stats": {
       "matches": 63,
       "wickets": 43,
@@ -1861,7 +1861,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.5,
     "set": "Set 2",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/415300/415377.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/415300/415377.jpg",
     "stats": {
       "matches": 34,
       "wickets": 28,
@@ -1897,7 +1897,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.5,
     "set": "Set 2",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/399000/399041.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/399000/399041.jpg",
     "stats": {
       "matches": 74,
       "wickets": 8,
@@ -1951,7 +1951,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.75,
     "set": "Set 3",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/a/a8/Prithvi_shaw.png",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Prithvi_shaw.png/320px-Prithvi_shaw.png",
     "stats": {
       "matches": 53,
       "runs": 860,
@@ -2401,7 +2401,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 2,
     "set": "Set 4",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/415200/415227.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/415200/415227.jpg",
     "stats": {
       "matches": 235,
       "wickets": 105,
@@ -2545,7 +2545,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 0.75,
     "set": "Set 4",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/402300/402346.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/402300/402346.jpg",
     "stats": {
       "matches": 80,
       "runs": 508,
@@ -2581,7 +2581,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 0.75,
     "set": "Set 4",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/402000/402034.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/402000/402034.jpg",
     "stats": {
       "matches": 79,
       "runs": 946,
@@ -2851,7 +2851,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.3,
     "set": "Set 4",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/0/05/Sachin_Tendulkar_family_%28cropped%29.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Sachin_Tendulkar_family_%28cropped%29.jpg/320px-Sachin_Tendulkar_family_%28cropped%29.jpg",
     "stats": {
       "matches": 35,
       "runs": 890,
@@ -2923,7 +2923,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 0.3,
     "set": "Set 4",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/416600/416657.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/416600/416657.jpg",
     "stats": {
       "matches": 49,
       "wickets": 24,
@@ -2941,7 +2941,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.3,
     "set": "Set 4",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/415800/415832.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/415800/415832.jpg",
     "stats": {
       "matches": 16,
       "wickets": 5,
@@ -2959,7 +2959,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.3,
     "set": "Set 4",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/418200/418219.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/418200/418219.jpg",
     "stats": {
       "matches": 61,
       "wickets": 57,
@@ -3301,7 +3301,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.3,
     "set": "Set 4",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/d/d0/RasikhSalam.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/RasikhSalam.jpg/320px-RasikhSalam.jpg",
     "stats": {
       "matches": 62,
       "wickets": 17,
@@ -3391,7 +3391,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.3,
     "set": "Set 4",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/416800/416869.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/416800/416869.jpg",
     "stats": {
       "matches": 48,
       "runs": 611,
@@ -3553,7 +3553,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 2,
     "set": "AL1",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/417900/417990.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/417900/417990.jpg",
     "stats": {
       "matches": 213,
       "runs": 4655,
@@ -3571,7 +3571,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 1,
     "set": "AL1",
-    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_1200,q_50/lsci/db/PICTURES/CMS/403300/403345.jpg",
+    "image": "https://img1.hscicdn.com/image/upload/f_auto,t_ds_w_400,q_50/lsci/db/PICTURES/CMS/403300/403345.jpg",
     "stats": {
       "matches": 103,
       "runs": 2243,
@@ -3589,7 +3589,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 2,
     "set": "WK1",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/f/fd/3_31_Another_four_%28Ben_Duckett_cropped%29.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fd/3_31_Another_four_%28Ben_Duckett_cropped%29.jpg/320px-3_31_Another_four_%28Ben_Duckett_cropped%29.jpg",
     "stats": {
       "matches": 210,
       "runs": 4028,
@@ -3625,7 +3625,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 1,
     "set": "WK1",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/4/49/2_05_Bairstow_out.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/2_05_Bairstow_out.jpg/320px-2_05_Bairstow_out.jpg",
     "stats": {
       "matches": 65,
       "runs": 2273,
@@ -3787,7 +3787,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.3,
     "set": "UBA1",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/d/d4/Anmolpreet_Singh_2.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Anmolpreet_Singh_2.jpg/320px-Anmolpreet_Singh_2.jpg",
     "stats": {
       "matches": 76,
       "runs": 977,
@@ -3949,7 +3949,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.3,
     "set": "UAL1",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/f/fd/Sanvir_Singh.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fd/Sanvir_Singh.jpg/320px-Sanvir_Singh.jpg",
     "stats": {
       "matches": 35,
       "runs": 160,
@@ -4093,7 +4093,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.3,
     "set": "UWK1",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/4/4e/Tushar_Raheja.JPG",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Tushar_Raheja.JPG/320px-Tushar_Raheja.JPG",
     "stats": {
       "matches": 71,
       "runs": 193,
@@ -4255,7 +4255,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.5,
     "set": "USP1",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/2/28/Karn_Sharma_2015.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/28/Karn_Sharma_2015.jpg/320px-Karn_Sharma_2015.jpg",
     "stats": {
       "matches": 43,
       "wickets": 8,
@@ -4345,7 +4345,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 0.3,
     "set": "USP1",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Flag_of_Afghanistan_%282013%E2%80%932021%29.svg/960px-Flag_of_Afghanistan_%282013%E2%80%932021%29.svg.png",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Flag_of_Afghanistan_%282013%E2%80%932021%29.svg/320px-Flag_of_Afghanistan_%282013%E2%80%932021%29.svg.png",
     "stats": {
       "matches": 20,
       "wickets": 41,
@@ -4453,7 +4453,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 1,
     "set": "BA2",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/3/37/REEZA_HENDRICKS_%2815519916117%29.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/REEZA_HENDRICKS_%2815519916117%29.jpg/320px-REEZA_HENDRICKS_%2815519916117%29.jpg",
     "stats": {
       "matches": 63,
       "runs": 1411,
@@ -4543,7 +4543,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 1,
     "set": "AL2",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/1/1c/Daniel_Sams_Batting.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Daniel_Sams_Batting.jpg/320px-Daniel_Sams_Batting.jpg",
     "stats": {
       "matches": 97,
       "runs": 1359,
@@ -4597,7 +4597,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 2,
     "set": "AL2",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/d/de/Jason_Holder.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/Jason_Holder.jpg/320px-Jason_Holder.jpg",
     "stats": {
       "matches": 158,
       "runs": 3237,
@@ -4651,7 +4651,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 2,
     "set": "AL2",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/b/bd/Sean_Abbott_playing_for_the_Sydney_Sixers.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Sean_Abbott_playing_for_the_Sydney_Sixers.jpg/320px-Sean_Abbott_playing_for_the_Sydney_Sixers.jpg",
     "stats": {
       "matches": 126,
       "runs": 4201,
@@ -4723,7 +4723,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 2,
     "set": "WK2",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/9/95/Josh_Inglis_The_Test_clip.png",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/95/Josh_Inglis_The_Test_clip.png/320px-Josh_Inglis_The_Test_clip.png",
     "stats": {
       "matches": 215,
       "runs": 5048,
@@ -4777,7 +4777,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 2,
     "set": "WK2",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/c/c3/Shai_Hope.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Shai_Hope.jpg/320px-Shai_Hope.jpg",
     "stats": {
       "matches": 158,
       "runs": 3346,
@@ -4885,7 +4885,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 2,
     "set": "FA2",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/d/d9/Kyle_Jamieson_2015_%28cropped%29.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/Kyle_Jamieson_2015_%28cropped%29.jpg/320px-Kyle_Jamieson_2015_%28cropped%29.jpg",
     "stats": {
       "matches": 109,
       "wickets": 155,
@@ -4903,7 +4903,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 2,
     "set": "FA2",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/2/2b/Lungi_Ngidi_2022.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/Lungi_Ngidi_2022.jpg/320px-Lungi_Ngidi_2022.jpg",
     "stats": {
       "matches": 126,
       "wickets": 104,
@@ -4939,7 +4939,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 1.5,
     "set": "FA2",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/e/e1/2_20_Saqib_Mahmood.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/2_20_Saqib_Mahmood.jpg/320px-2_20_Saqib_Mahmood.jpg",
     "stats": {
       "matches": 51,
       "wickets": 66,
@@ -4957,7 +4957,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 1.5,
     "set": "FA2",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/9/9e/Umesh_Yadav.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Umesh_Yadav.jpg/320px-Umesh_Yadav.jpg",
     "stats": {
       "matches": 123,
       "wickets": 73,
@@ -5029,7 +5029,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 0.75,
     "set": "SP2",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/8/84/Rishad_Hossain%2C_2025-02-08_Fortune_Barishal_BPL_2025_Champions_Trophy_Presentation_Dhaka_%28PID-0003668%29_%28cropped%29.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/Rishad_Hossain%2C_2025-02-08_Fortune_Barishal_BPL_2025_Champions_Trophy_Presentation_Dhaka_%28PID-0003668%29_%28cropped%29.jpg/320px-Rishad_Hossain%2C_2025-02-08_Fortune_Barishal_BPL_2025_Champions_Trophy_Presentation_Dhaka_%28PID-0003668%29_%28cropped%29.jpg",
     "stats": {
       "matches": 34,
       "wickets": 42,
@@ -5137,7 +5137,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.3,
     "set": "UBA2",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/f/f1/MananVohra_Magic_book_of_record.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/MananVohra_Magic_book_of_record.jpg/320px-MananVohra_Magic_book_of_record.jpg",
     "stats": {
       "matches": 78,
       "runs": 387,
@@ -5335,7 +5335,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.3,
     "set": "UAL2",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/5/5c/Suyash_Prabhudessai.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Suyash_Prabhudessai.jpg/320px-Suyash_Prabhudessai.jpg",
     "stats": {
       "matches": 59,
       "runs": 840,
@@ -5713,7 +5713,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.3,
     "set": "USP2",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/a/a8/HImanshu_sharma_bollywood_film_writer.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/HImanshu_sharma_bollywood_film_writer.jpg/320px-HImanshu_sharma_bollywood_film_writer.jpg",
     "stats": {
       "matches": 73,
       "wickets": 36,
@@ -5785,7 +5785,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.3,
     "set": "USP2",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/f/f7/M_Ashwin.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f7/M_Ashwin.jpg/320px-M_Ashwin.jpg",
     "stats": {
       "matches": 70,
       "wickets": 57,
@@ -5857,7 +5857,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 1.25,
     "set": "AL3",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/c/cd/2_10_Beau_Webster_mugshot.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/2_10_Beau_Webster_mugshot.jpg/320px-2_10_Beau_Webster_mugshot.jpg",
     "stats": {
       "matches": 101,
       "runs": 1932,
@@ -5911,7 +5911,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 2,
     "set": "AL3",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/d/d5/4_34_Dan_Lawrence_mugshot.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/4_34_Dan_Lawrence_mugshot.jpg/320px-4_34_Dan_Lawrence_mugshot.jpg",
     "stats": {
       "matches": 186,
       "runs": 5279,
@@ -5947,7 +5947,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 1,
     "set": "AL3",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/f/fc/Gulbadin_Naib.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Gulbadin_Naib.jpg/320px-Gulbadin_Naib.jpg",
     "stats": {
       "matches": 118,
       "runs": 2562,
@@ -5965,7 +5965,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 0.75,
     "set": "AL3",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/4/43/3_57_Rehan_Ahmed.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/3_57_Rehan_Ahmed.jpg/320px-3_57_Rehan_Ahmed.jpg",
     "stats": {
       "matches": 55,
       "runs": 723,
@@ -6037,7 +6037,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 1.5,
     "set": "FA3",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/e/ed/20251224_Jhye_Richardson_01.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/20251224_Jhye_Richardson_01.jpg/320px-20251224_Jhye_Richardson_01.jpg",
     "stats": {
       "matches": 94,
       "wickets": 72,
@@ -6109,7 +6109,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 0.75,
     "set": "FA3",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/3/30/Richard_Gleeson.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Richard_Gleeson.jpg/320px-Richard_Gleeson.jpg",
     "stats": {
       "matches": 18,
       "wickets": 55,
@@ -6163,7 +6163,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 0.75,
     "set": "FA3",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/4/43/Taskin_Ahmed_in_2024_%28cropped%29.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Taskin_Ahmed_in_2024_%28cropped%29.jpg/320px-Taskin_Ahmed_in_2024_%28cropped%29.jpg",
     "stats": {
       "matches": 67,
       "wickets": 41,
@@ -6613,7 +6613,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 0.4,
     "set": "UWK3",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/a/a5/3_41_Matthew_Revis_Tom_Moores_%28cropped%29.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/3_41_Matthew_Revis_Tom_Moores_%28cropped%29.jpg/320px-3_41_Matthew_Revis_Tom_Moores_%28cropped%29.jpg",
     "stats": {
       "matches": 73,
       "runs": 455,
@@ -6649,7 +6649,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.3,
     "set": "UFA3",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/7/7d/Abhilash_shetty_2021.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Abhilash_shetty_2021.jpg/320px-Abhilash_shetty_2021.jpg",
     "stats": {
       "matches": 74,
       "wickets": 59,
@@ -6793,7 +6793,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 0.3,
     "set": "UFA3",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/2/2b/SA20Logo.png",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/SA20Logo.png/320px-SA20Logo.png",
     "stats": {
       "matches": 18,
       "wickets": 40,
@@ -7045,7 +7045,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 1.25,
     "set": "AL4",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/7/78/Kyle_Mayers_batting_at_Perth_Stadium%2C_First_Test_Australia_versus_West_Indies%2C_2_December_2022_08.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/Kyle_Mayers_batting_at_Perth_Stadium%2C_First_Test_Australia_versus_West_Indies%2C_2_December_2022_08.jpg/320px-Kyle_Mayers_batting_at_Perth_Stadium%2C_First_Test_Australia_versus_West_Indies%2C_2_December_2022_08.jpg",
     "stats": {
       "matches": 65,
       "runs": 3000,
@@ -7117,7 +7117,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 1.25,
     "set": "AL4",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/1/12/Roston_Chase_batting_at_Perth_Stadium%2C_First_Test_Australia_versus_West_Indies%2C_2_December_2022_09.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Roston_Chase_batting_at_Perth_Stadium%2C_First_Test_Australia_versus_West_Indies%2C_2_December_2022_09.jpg/320px-Roston_Chase_batting_at_Perth_Stadium%2C_First_Test_Australia_versus_West_Indies%2C_2_December_2022_09.jpg",
     "stats": {
       "matches": 124,
       "runs": 2384,
@@ -7135,7 +7135,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 1.5,
     "set": "FA4",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/8/80/Jason_behrendorff.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Jason_behrendorff.jpg/320px-Jason_behrendorff.jpg",
     "stats": {
       "matches": 59,
       "wickets": 95,
@@ -7171,7 +7171,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 0.75,
     "set": "FA4",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/a/a8/2_14_Matthew_Potts_mugshot.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/2_14_Matthew_Potts_mugshot.jpg/320px-2_14_Matthew_Potts_mugshot.jpg",
     "stats": {
       "matches": 28,
       "wickets": 51,
@@ -7189,7 +7189,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 0.75,
     "set": "FA4",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/e/ea/Nahid_Rana_2024_%28cropped%29.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Nahid_Rana_2024_%28cropped%29.jpg/320px-Nahid_Rana_2024_%28cropped%29.jpg",
     "stats": {
       "matches": 65,
       "wickets": 53,
@@ -7207,7 +7207,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 1.25,
     "set": "FA4",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/3/3e/Olly_Stone.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Olly_Stone.jpg/320px-Olly_Stone.jpg",
     "stats": {
       "matches": 122,
       "wickets": 63,
@@ -7243,7 +7243,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 0.75,
     "set": "FA4",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Tanzim_Hasan_Sakib_in_2024.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9f/Tanzim_Hasan_Sakib_in_2024.jpg/320px-Tanzim_Hasan_Sakib_in_2024.jpg",
     "stats": {
       "matches": 56,
       "wickets": 14,
@@ -7297,7 +7297,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.3,
     "set": "UBA4",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/8/88/Ayaz_Khan.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Ayaz_Khan.jpg/320px-Ayaz_Khan.jpg",
     "stats": {
       "matches": 10,
       "runs": 277,
@@ -7333,7 +7333,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.3,
     "set": "UBA4",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/b/b5/3_19_Hammond_drives.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/3_19_Hammond_drives.jpg/320px-3_19_Hammond_drives.jpg",
     "stats": {
       "matches": 32,
       "runs": 528,
@@ -7909,7 +7909,7 @@ export const IPL_PLAYERS = [
     "country": "OS",
     "basePrice": 0.75,
     "set": "FA5",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/5/5d/2018.02.03.19.47.57-Billy_Stanlake_%2840429028151%29.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/2018.02.03.19.47.57-Billy_Stanlake_%2840429028151%29.jpg/320px-2018.02.03.19.47.57-Billy_Stanlake_%2840429028151%29.jpg",
     "stats": {
       "matches": 80,
       "wickets": 49,
@@ -8161,7 +8161,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.3,
     "set": "UAL5",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Elvish_Yadav_snapped_at_BiggBoss_OTT2_Party_%28cropped%29.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Elvish_Yadav_snapped_at_BiggBoss_OTT2_Party_%28cropped%29.jpg/320px-Elvish_Yadav_snapped_at_BiggBoss_OTT2_Party_%28cropped%29.jpg",
     "stats": {
       "matches": 17,
       "runs": 295,
@@ -8359,7 +8359,7 @@ export const IPL_PLAYERS = [
     "country": "IND",
     "basePrice": 0.3,
     "set": "UAL6",
-    "image": "https://upload.wikimedia.org/wikipedia/commons/a/ad/Indian_-_Cosmic_Narayana_%28Vishnu%29_as_Infant_Krishna_-_Walters_543081.jpg",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/Indian_-_Cosmic_Narayana_%28Vishnu%29_as_Infant_Krishna_-_Walters_543081.jpg/320px-Indian_-_Cosmic_Narayana_%28Vishnu%29_as_Infant_Krishna_-_Walters_543081.jpg",
     "stats": {
       "matches": 57,
       "runs": 936,
