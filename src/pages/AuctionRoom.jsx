@@ -98,29 +98,59 @@ const AuctionRoom = () => {
    const displayAuctionState = optimisticState || currentAuction?.currentAuction;
 
 
-   // Audio unlocker for mobile devices
-   useEffect(() => {
-      if (!celebrationAudioRef.current) {
-         celebrationAudioRef.current = new Audio();
-      }
-      const unlockAudio = () => {
-         if (celebrationAudioRef.current) {
-            celebrationAudioRef.current.src = "data:audio/mp3;base64,//NExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
-            celebrationAudioRef.current.play().then(() => {
-               celebrationAudioRef.current.pause();
-               celebrationAudioRef.current.currentTime = 0;
-            }).catch(() => { });
-         }
-      };
+    // Single shared AudioContext for beeps — creating one per beep leaks
+    // contexts (browsers cap them) and spams device-renderer errors.
+    const beepCtxRef = useRef(null);
 
-      window.addEventListener('click', unlockAudio, { once: true });
-      window.addEventListener('touchstart', unlockAudio, { once: true });
+    // Create/resume the beep context. Resume is only attempted after a
+    // real user gesture (or sticky activation) — otherwise Chrome logs
+    // "The AudioContext was not allowed to start".
+    const unlockBeepCtx = (fromGesture = false) => {
+       try {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          if (!AC) return;
+          if (!beepCtxRef.current || beepCtxRef.current.state === 'closed') {
+             beepCtxRef.current = new AC();
+          }
+          const ctx = beepCtxRef.current;
+          const activated = fromGesture ||
+             (typeof navigator !== 'undefined' && navigator.userActivation && navigator.userActivation.hasBeenActive);
+          if (ctx.state === 'suspended' && activated) {
+             ctx.resume().catch(() => {});
+          }
+       } catch (e) { /* ignore */ }
+    };
 
-      return () => {
-         window.removeEventListener('click', unlockAudio);
-         window.removeEventListener('touchstart', unlockAudio);
-      };
-   }, []);
+    // Audio unlocker for mobile devices
+    useEffect(() => {
+       if (!celebrationAudioRef.current) {
+          celebrationAudioRef.current = new Audio();
+       }
+       const unlockAudio = () => {
+          if (celebrationAudioRef.current) {
+             celebrationAudioRef.current.src = "data:audio/mp3;base64,//NExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
+             celebrationAudioRef.current.play().then(() => {
+                celebrationAudioRef.current.pause();
+                celebrationAudioRef.current.currentTime = 0;
+             }).catch(() => { });
+          }
+          // Unlock the beep context in the same gesture so later beeps
+          // never trip the autoplay policy.
+          unlockBeepCtx(true);
+       };
+
+       window.addEventListener('click', unlockAudio, { once: true });
+       window.addEventListener('touchstart', unlockAudio, { once: true });
+       window.addEventListener('pointerdown', unlockAudio, { once: true });
+       window.addEventListener('keydown', unlockAudio, { once: true });
+
+       return () => {
+          window.removeEventListener('click', unlockAudio);
+          window.removeEventListener('touchstart', unlockAudio);
+          window.removeEventListener('pointerdown', unlockAudio);
+          window.removeEventListener('keydown', unlockAudio);
+       };
+    }, []);
 
 
    // Sync completion status
@@ -169,9 +199,6 @@ const AuctionRoom = () => {
     const speakTimerRef = useRef(null);
     const resumeTimerRef = useRef(null);
     const warmedUpRef = useRef(false);
-    // Single shared AudioContext for beeps — creating one per beep leaks
-    // contexts (browsers cap them) and spams device-renderer errors.
-    const beepCtxRef = useRef(null);
 
    const lastSpokenPlayerIdRef = useRef(null);
    const lastSpokenBidRef = useRef(0);
@@ -621,17 +648,9 @@ const AuctionRoom = () => {
 
     const getBeepCtx = () => {
        try {
-          const AC = window.AudioContext || window.webkitAudioContext;
-          if (!AC) return null;
-          if (!beepCtxRef.current || beepCtxRef.current.state === 'closed') {
-             beepCtxRef.current = new AC();
-          }
+          unlockBeepCtx();
           const ctx = beepCtxRef.current;
-          // A suspended context (autoplay policy / device hiccup) must be
-          // resumed before scheduling, otherwise beeps silently fail.
-          if (ctx.state === 'suspended') {
-             ctx.resume().catch(() => {});
-          }
+          if (!ctx || ctx.state === 'closed') return null;
           return ctx;
        } catch (e) {
           return null;
@@ -641,7 +660,9 @@ const AuctionRoom = () => {
     const playBeep = (freq = 440, duration = 0.1) => {
        try {
           const audioCtx = getBeepCtx();
-          if (!audioCtx || audioCtx.state === 'closed') return;
+          // Skip while suspended (pre-gesture) — scheduling on a suspended
+          // context is silently swallowed anyway, so don't waste work.
+          if (!audioCtx || audioCtx.state !== 'running') return;
           const oscillator = audioCtx.createOscillator();
           const gainNode = audioCtx.createGain();
 
@@ -1249,7 +1270,7 @@ const AuctionRoom = () => {
                                {/* Confetti deleted for brevity during recovery */}
                                <div className="flex flex-col items-center text-center z-10 px-4 sm:px-8 py-8 sm:py-10 w-full bg-gradient-to-b from-white/10 to-transparent">
                                  <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }} className="relative mb-6">
-                                    <img src={currentPlayer.image} alt={currentPlayer.name} className="w-32 h-32 md:w-36 md:h-40 object-cover rounded-3xl border-4 border-white/30 shadow-2xl relative z-10" />
+                                     <img src={currentPlayer.image} alt={currentPlayer.name} className="w-36 h-48 md:w-44 md:h-56 object-cover object-top rounded-3xl border-4 border-white/30 shadow-2xl relative z-10" />
                                  </motion.div>
                                  <motion.h2 initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }} className="text-xl sm:text-2xl md:text-3xl font-black text-white uppercase tracking-tighter mb-1 drop-shadow-md">
                                     {currentPlayer.name}
@@ -1278,24 +1299,32 @@ const AuctionRoom = () => {
                                  <div className="absolute top-0 inset-x-0 h-1 bg-white/5">
                                     <motion.div initial={{ width: "100%" }} animate={{ width: `${(timeLeft / (currentAuction?.settings?.bidTimer || 10)) * 100}%` }} className={`h-full transition-colors duration-1000 ${timeLeft < 5 ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]'}`} />
                                  </div>
-                                 <div className="p-4 sm:p-6 md:p-10 flex flex-col md:flex-row items-center gap-4 sm:gap-6 md:gap-10">
-                                    <div className="w-28 h-28 sm:w-36 sm:h-36 md:w-60 md:h-80 bg-gradient-to-b from-white/10 to-transparent rounded-2xl md:rounded-[2rem] overflow-hidden border border-white/10 relative z-10 shadow-[0_12px_40px_rgba(0,0,0,0.4)] group hover:scale-[1.02] transition-transform duration-500 shrink-0">
-                                       <img src={currentPlayer.image} alt={currentPlayer.name} decoding="async" className="w-full h-full object-cover" />
-                                    </div>
-                                    <div className="flex-1 flex flex-col gap-4 md:gap-6 w-full text-center md:text-left">
-                                       <div>
-                                          <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2 md:mb-4">
-                                             <span className="bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[8px] md:text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest">{currentPlayer.role}</span>
-                                             <span className="bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[8px] md:text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest">{currentPlayer.type}</span>
-                                          </div>
-                                          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black tracking-tight text-white leading-none">{currentPlayer.name}</h2>
-                                       </div>
-                                       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 bg-white/[0.02] p-2.5 sm:p-3 md:p-4 rounded-2xl border border-white/[0.04] backdrop-blur-md">
-                                          <div className="text-center"><span className="block text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Matches</span><span className="text-lg sm:text-xl font-bold text-gray-100">{currentPlayer.stats?.matches || 0}</span></div>
-                                          {currentPlayer.stats?.runs !== undefined && (<div className="text-center border-l border-white/5"><span className="block text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Runs</span><span className="text-lg sm:text-xl font-bold text-yellow-500">{currentPlayer.stats.runs}</span></div>)}
-                                          {currentPlayer.stats?.sr !== undefined && (<div className="text-center border-l border-white/5"><span className="block text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">S.Rate</span><span className="text-lg sm:text-xl font-bold text-gray-100">{currentPlayer.stats.sr}</span></div>)}
-                                          {currentPlayer.stats?.wickets !== undefined && (<div className="text-center border-l border-white/5"><span className="block text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Wkts</span><span className="text-lg sm:text-xl font-bold text-green-500">{currentPlayer.stats.wickets}</span></div>)}
-                                       </div>
+                                  <div className="p-4 sm:p-6 md:p-10 flex flex-col md:flex-row items-center gap-4 sm:gap-6 md:gap-10">
+                                     <div className="w-36 sm:w-44 md:w-60 aspect-[3/4] bg-gradient-to-b from-white/10 to-transparent rounded-2xl md:rounded-[2rem] overflow-hidden border border-white/10 relative z-10 shadow-[0_12px_40px_rgba(0,0,0,0.4)] shrink-0">
+                                        <img src={currentPlayer.image} alt={currentPlayer.name} decoding="async" className="w-full h-full object-cover object-top" />
+                                     </div>
+                                     <div className="flex-1 flex flex-col gap-4 md:gap-6 w-full text-center md:text-left">
+                                        <div>
+                                           <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2 md:mb-4">
+                                              <span className="bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[8px] md:text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest">{currentPlayer.role}</span>
+                                              <span className="bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[8px] md:text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest">{currentPlayer.type}</span>
+                                              {currentPlayer.country && currentPlayer.country !== 'IND' && (
+                                                 <span className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[8px] md:text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest">✈ Overseas</span>
+                                              )}
+                                              <span className="bg-white/5 border border-white/10 text-gray-400 text-[8px] md:text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest">Base ₹{(currentPlayer.basePrice || 0).toFixed(2)} Cr</span>
+                                           </div>
+                                           <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black tracking-tight text-white leading-none">{currentPlayer.name}</h2>
+                                           {currentPlayer.set && (
+                                              <p className="text-[9px] md:text-[10px] font-bold text-gray-500 uppercase tracking-[0.25em] mt-1.5">{currentPlayer.set}</p>
+                                           )}
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                                           <div className="text-center bg-white/[0.03] border border-white/5 rounded-xl py-2.5 px-1"><span className="block text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Matches</span><span className="text-lg sm:text-xl font-bold text-gray-100">{currentPlayer.stats?.matches ?? 0}</span></div>
+                                           {currentPlayer.stats?.runs !== undefined && currentPlayer.stats?.runs !== '-' && (<div className="text-center bg-white/[0.03] border border-white/5 rounded-xl py-2.5 px-1"><span className="block text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Runs</span><span className="text-lg sm:text-xl font-bold text-yellow-500">{currentPlayer.stats.runs}</span></div>)}
+                                           {currentPlayer.stats?.sr !== undefined && currentPlayer.stats?.sr !== '-' && (<div className="text-center bg-white/[0.03] border border-white/5 rounded-xl py-2.5 px-1"><span className="block text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">S.Rate</span><span className="text-lg sm:text-xl font-bold text-gray-100">{currentPlayer.stats.sr}</span></div>)}
+                                           {currentPlayer.stats?.wickets !== undefined && currentPlayer.stats?.wickets !== '-' && (<div className="text-center bg-white/[0.03] border border-white/5 rounded-xl py-2.5 px-1"><span className="block text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Wkts</span><span className="text-lg sm:text-xl font-bold text-green-500">{currentPlayer.stats.wickets}</span></div>)}
+                                           {currentPlayer.stats?.econ !== undefined && currentPlayer.stats?.econ !== '-' && (<div className="text-center bg-white/[0.03] border border-white/5 rounded-xl py-2.5 px-1"><span className="block text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Econ</span><span className="text-lg sm:text-xl font-bold text-blue-400">{currentPlayer.stats.econ}</span></div>)}
+                                        </div>
                                        <div className="flex items-center justify-between flex-wrap gap-2 mt-2 md:mt-4">
                                           <div className="text-left">
                                              <span className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Current Bid</span>
@@ -1311,29 +1340,29 @@ const AuctionRoom = () => {
                                                 )}
                                              </div>
                                           </div>
-                                          <div className={`w-14 h-14 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full flex flex-col items-center justify-center transition-all duration-300 border-2 shrink-0 ${timeLeft < 5
-                                             ? 'border-red-500 bg-red-500/10 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.2)]'
-                                             : 'border-green-500/30 bg-green-500/5 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.1)]'
-                                             }`}>
-                                             <span className="text-xl sm:text-lg md:text-xl font-black leading-none">{timeLeft}</span>
-                                             <span className="text-[8px] md:text-[7px] font-bold tracking-widest uppercase mt-0.5">Sec</span>
-                                          </div>
+                                           <div className={`w-16 h-16 md:w-20 md:h-20 rounded-full flex flex-col items-center justify-center transition-all duration-300 border-2 shrink-0 ${timeLeft < 5
+                                              ? 'border-red-500 bg-red-500/10 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.2)]'
+                                              : 'border-green-500/30 bg-green-500/5 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.1)]'
+                                              }`}>
+                                              <span className="text-xl md:text-2xl font-black leading-none">{timeLeft}</span>
+                                              <span className="text-[8px] md:text-[7px] font-bold tracking-widest uppercase mt-0.5">Sec</span>
+                                           </div>
                                        </div>
                                     </div>
                                  </div>
-                                 <div className="bg-black/20 border-t border-white/5 p-3 sm:p-4 md:p-6 flex gap-3 md:gap-4">
-                                    <button
-                                       onClick={handleBid}
-                                       disabled={timeLeft === 0 || displayAuctionState?.status !== 'bidding' || displayAuctionState?.highBidderId === user?.uid}
-                                       className={`flex-1 h-[52px] sm:h-14 md:h-18 font-black text-[15px] sm:text-base md:text-xl leading-tight px-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:opacity-50 disabled:grayscale cursor-pointer ${displayAuctionState?.highBidderId === user?.uid
-                                          ? 'bg-white/5 text-green-500 border border-green-500/20 shadow-inner'
-                                          : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-[#050505] shadow-[0_4px_20px_rgba(34,197,94,0.2)] hover:shadow-[0_8px_30px_rgba(34,197,94,0.3)]'
-                                          }`}
-                                    >
-                                       {displayAuctionState?.status === 'paused' ? 'PAUSED' : displayAuctionState?.highBidderId === user?.uid ? "LEADING BIDDER" : `PLACE BID: ₹${nextBidAmount.toFixed(2)} Cr`}
-                                    </button>
-                                    <button onClick={() => setShowPlayersOverlay(true)} className="w-12 h-12 sm:w-14 sm:h-14 md:w-18 md:h-18 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-all"><List size={20} /></button>
-                                 </div>
+                                  <div className="bg-black/20 border-t border-white/5 p-3 sm:p-4 md:p-6 flex gap-3 md:gap-4">
+                                     <button
+                                        onClick={handleBid}
+                                        disabled={timeLeft === 0 || displayAuctionState?.status !== 'bidding' || displayAuctionState?.highBidderId === user?.uid}
+                                        className={`flex-1 h-14 md:h-16 font-black text-[15px] sm:text-base md:text-xl leading-tight px-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:opacity-50 disabled:grayscale cursor-pointer ${displayAuctionState?.highBidderId === user?.uid
+                                           ? 'bg-white/5 text-green-500 border border-green-500/20 shadow-inner'
+                                           : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-[#050505] shadow-[0_4px_20px_rgba(34,197,94,0.2)] hover:shadow-[0_8px_30px_rgba(34,197,94,0.3)]'
+                                           }`}
+                                     >
+                                        {displayAuctionState?.status === 'paused' ? 'PAUSED' : displayAuctionState?.highBidderId === user?.uid ? "LEADING BIDDER" : `PLACE BID: ₹${nextBidAmount.toFixed(2)} Cr`}
+                                     </button>
+                                     <button onClick={() => setShowPlayersOverlay(true)} className="w-14 h-14 md:w-16 md:h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-all shrink-0"><List size={20} /></button>
+                                  </div>
                               </div>
                            </motion.div>
                         )}
@@ -1742,61 +1771,65 @@ const SoldCard = ({ msg }) => {
       }
    };
 
-   return (
-      <div className="space-y-2 mb-4 sm:mb-6">
-         <div ref={cardRef} className="relative w-full min-h-[400px] max-h-[480px] h-auto aspect-[4/5] rounded-2xl sm:rounded-[2rem] overflow-hidden bg-[#0A0A0B] border border-white/10 shadow-2xl">
-            <div className={`absolute inset-0 opacity-20 bg-gradient-to-br ${team?.color.replace('bg-', 'from-')} to-black`} />
-            <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:12px_12px] opacity-20" />
+    return (
+       <div className="space-y-2 mb-4 sm:mb-6">
+          <div ref={cardRef} className="relative w-full aspect-[4/5] rounded-2xl sm:rounded-[2rem] overflow-hidden bg-[#0A0A0B] border border-white/10 shadow-2xl">
+             <div className={`absolute inset-0 opacity-20 bg-gradient-to-br ${(team?.color || 'bg-yellow-500').replace('bg-', 'from-')} to-black`} />
+             <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:12px_12px] opacity-20" />
 
-            <div className="relative h-full flex flex-col p-4 sm:p-6 z-10 justify-between">
-               <div className="flex justify-between items-start mb-2 sm:mb-4">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl p-1.5 sm:p-2 border border-white/10">
-                     <img src={team?.logo} alt="" className="w-full h-full object-contain " />
-                  </div>
-                  <div className="text-right uppercase tracking-[0.15em] sm:tracking-[0.2em]">
-                     <p className="text-[7px] sm:text-[8px] font-black text-blue-500 mb-0.5">IPL Auction</p>
-                     <p className="text-[9px] sm:text-[10px] font-bold text-white/50 leading-none">Sold to</p>
-                     <p className="text-[11px] sm:text-[12px] font-black text-white">{msg.metadata.buyerName}</p>
-                  </div>
-               </div>
+             <div className="relative h-full flex flex-col p-4 sm:p-6 z-10">
+                {/* Header: franchise identity + sold stamp */}
+                <div className="flex justify-between items-start">
+                   <div className="flex items-center gap-2.5">
+                      <div className="w-11 h-11 sm:w-14 sm:h-14 bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl p-1.5 sm:p-2 border border-white/10">
+                         <img src={team?.logo} alt="" className="w-full h-full object-contain" />
+                      </div>
+                      <div>
+                         <p className="text-[11px] sm:text-sm font-black text-white uppercase tracking-widest leading-none">{team?.name || 'Franchise'}</p>
+                         <p className="text-[7px] sm:text-[8px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-1">IPL Auction</p>
+                      </div>
+                   </div>
+                   <div className="text-right">
+                      <span className="inline-block bg-green-500 text-black text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] px-2.5 py-1 rounded-lg -rotate-3 shadow-lg">Sold</span>
+                      <p className="text-[9px] sm:text-[10px] font-bold text-white/50 uppercase tracking-widest mt-1.5">to {msg.metadata.buyerName}</p>
+                   </div>
+                </div>
 
-               <div className="flex-1 flex flex-col justify-center items-center py-2 sm:py-4">
-                  <div className="relative w-28 h-28 sm:w-40 sm:h-40 group">
-                     <div className={`absolute inset-0 rounded-full blur-3xl opacity-30 ${team?.color}`} />
-                     <img 
-                        src={player?.image} 
-                        className="relative w-full h-full object-contain z-10 drop-shadow-[0_0_20px_rgba(0,0,0,0.5)]" 
-                        alt="" 
-                        onError={(e) => {
-                           e.target.onerror = null;
-                           e.target.src = 'https://api.dicebear.com/7.x/initials/svg?seed=' + encodeURIComponent(player?.name || 'Player');
-                        }}
-                     />
-                  </div>
-                  <div className="text-center mt-2 sm:mt-4">
-                     <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white leading-tight">{player?.name}</h2>
-                     <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] sm:tracking-[0.3em]">{player?.role} • {player?.country}</p>
-                  </div>
-               </div>
+                {/* Player hero: circular portrait echoing the glow */}
+                <div className="flex-1 flex flex-col justify-center items-center py-3 sm:py-5 min-h-0">
+                   <div className="relative w-32 h-32 sm:w-44 sm:h-44">
+                      <div className={`absolute -inset-2 rounded-full blur-2xl opacity-40 ${team?.color || 'bg-yellow-500'}`} />
+                      <img 
+                         src={player?.image} 
+                         className="relative w-full h-full object-cover object-top z-10 rounded-full border-4 border-white/20 shadow-2xl bg-white/5" 
+                         alt="" 
+                         onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = 'https://api.dicebear.com/7.x/initials/svg?seed=' + encodeURIComponent(player?.name || 'Player');
+                         }}
+                      />
+                   </div>
+                   <div className="text-center mt-3 sm:mt-4">
+                      <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white leading-tight">{player?.name}</h2>
+                      <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-[0.25em] sm:tracking-[0.3em] mt-1">{player?.role} • {player?.country}</p>
+                   </div>
+                </div>
 
-               <div className="space-y-3 sm:space-y-4">
-                  <div className="text-center">
-                     <p className="text-sm sm:text-[16px] font-black italic uppercase tracking-wider text-yellow-500 drop-shadow-lg">#{slogan.slogan}</p>
-
-                  </div>
-
-                  <div className="bg-white/5 backdrop-blur-md border border-white/10 p-3 sm:p-4 rounded-2xl sm:rounded-3xl text-center">
-
-                     <p className="text-xl sm:text-2xl font-black text-white">₹{msg.metadata.bid.toFixed(2)} Cr</p>
-                  </div>
-               </div>
-            </div>
-         </div>
-         <button onClick={handleSave} className="w-full flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-white/5 hover:border-white/10 text-gray-400 hover:text-white">
-            <Download size={14} /> Save Player Card
-         </button>
-      </div>
-   );
+                {/* Price + slogan footer */}
+                <div className="space-y-2.5 sm:space-y-3">
+                   <div className="bg-white/5 backdrop-blur-md border border-white/10 px-4 py-3 sm:p-4 rounded-2xl sm:rounded-3xl text-center">
+                      <p className="text-[8px] sm:text-[9px] font-black text-gray-500 uppercase tracking-[0.3em] mb-1">Winning Bid</p>
+                      <p className="text-2xl sm:text-3xl font-black text-white">₹{msg.metadata.bid.toFixed(2)} <span className="text-sm sm:text-base font-bold text-gray-400">Cr</span></p>
+                   </div>
+                   <p className="text-center text-xs sm:text-sm font-black italic uppercase tracking-wider text-yellow-500 drop-shadow-lg">#{slogan.slogan}</p>
+                </div>
+             </div>
+          </div>
+          <button onClick={handleSave} className="w-full flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-white/5 hover:border-white/10 text-gray-400 hover:text-white">
+             <Download size={14} /> Save Player Card
+          </button>
+       </div>
+    );
 };
 
 export default AuctionRoom;
