@@ -30,8 +30,8 @@ const LogoMarquee = () => {
       <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-[#050505] to-transparent z-10" />
 
       <motion.div
-        className="flex w-max min-w-0 gap-12 items-center"
-        animate={{ x: [0, -1920] }}
+        className="flex w-max min-w-0 items-center"
+        animate={{ x: ['0%', '-50%'] }}
         transition={{
           duration: 40,
           repeat: Infinity,
@@ -39,7 +39,9 @@ const LogoMarquee = () => {
         }}
       >
         {marqueeTeams.map((t, idx) => (
-          <div key={`${t.id}-${idx}`} className="flex-shrink-0 group">
+          // Symmetric padding (not container gap) keeps both halves exactly
+          // equal width, so the -50% loop point is invisible and endless.
+          <div key={`${t.id}-${idx}`} className="flex-shrink-0 px-6 group">
             <img
               src={t.logo}
               alt={`${t.name} IPL Logo`}
