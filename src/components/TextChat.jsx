@@ -213,7 +213,7 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                               key={msg.id || index}
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
-                              className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[85%] ${isMe ? 'ml-auto' : 'mr-auto'}`}
+                              className={`flex flex-col min-w-0 ${isMe ? 'items-end' : 'items-start'} max-w-[85%] ${isMe ? 'ml-auto' : 'mr-auto'}`}
                            >
                               {/* Name and Team Header (only for other users) */}
                               {!isMe && (
@@ -235,7 +235,7 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                               {/* Speech Bubble (tap for reactions) */}
                               <div
                                  onClick={() => msg.id && setReactFor(reactFor === msg.id ? null : msg.id)}
-                                 className={`rounded-2xl text-[11px] leading-relaxed break-words shadow-lg overflow-hidden cursor-pointer ${
+                                 className={`rounded-2xl text-[11px] leading-relaxed break-words [overflow-wrap:anywhere] shadow-lg overflow-hidden cursor-pointer ${
                                     msg.type === 'gif' || (msg.text?.startsWith('http') && msg.text?.includes('.gif'))
                                        ? 'border border-white/10 max-w-[200px]'
                                        : isMe
@@ -334,8 +334,8 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                   </div>
                )}
 
-               {/* Message Input Box */}
-               <form onSubmit={handleSend} className="p-3 border-t border-white/5 bg-white/[0.01] flex gap-2 relative">
+               {/* Message Input Box — pinned, never pushed out by bubbles */}
+               <form onSubmit={handleSend} className="p-3 border-t border-white/5 bg-[#0c0c0c] flex gap-2 relative z-10 shrink-0 sticky bottom-0">
                   <button
                      type="button"
                      onClick={() => setShowGifPicker(!showGifPicker)}

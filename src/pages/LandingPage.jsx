@@ -19,7 +19,6 @@ import {
   Wifi
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import GithubStarButton from '../components/GithubStarButton';
 import AuctionActivityFeed from '../components/AuctionActivityFeed';
 import Footer from '../components/Footer';
 
@@ -145,7 +144,7 @@ const Navbar = ({ user, logout }) => (
         <a href="#modes" className="hover:text-white transition-colors">Modes</a>
         <a href="#how" className="hover:text-white transition-colors">How it works</a>
       </nav>
-      <div className="flex items-center gap-2.5 shrink-0 pr-20 sm:pr-24">
+      <div className="flex items-center gap-2.5 shrink-0">
         {user ? (
           <>
             {user.photoURL && (
@@ -175,61 +174,141 @@ const Navbar = ({ user, logout }) => (
 );
 
 const Hero = ({ onCreate, onJoin }) => (
-  <div className="text-center relative max-w-4xl mx-auto px-4 pt-12 sm:pt-16 pb-8">
-    <h1 className="sr-only">IPL Auction Simulator &amp; Game - Live IPL Mega Auction 2026</h1>
-    <motion.div
-      variants={itemVariants}
-      className="inline-flex items-center gap-2 border border-yellow-500/30 bg-yellow-500/5 text-yellow-500 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md mb-6 shadow-[0_0_20px_rgba(234,179,8,0.1)]"
-    >
-      <span className="relative flex h-2 w-2">
-        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75" />
-        <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500" />
-      </span>
-      Live IPL Auction Season
-    </motion.div>
-
-    <motion.div variants={itemVariants} className="text-[clamp(0.9rem,3vw,1.1rem)] font-extrabold tracking-[0.35em] text-gray-400 uppercase">
-      Host your own
-    </motion.div>
-    <motion.div variants={itemVariants} className="text-[clamp(2.75rem,10vw,6.5rem)] font-black tracking-tighter text-[#ff5500] leading-[0.95] uppercase italic drop-shadow-[0_4px_24px_rgba(255,85,0,0.25)] mt-2">
-      IPL Mega<br />Auction
-    </motion.div>
-
-    <motion.p variants={itemVariants} className="text-xs sm:text-base text-gray-400 font-medium max-w-xl mx-auto mt-5 leading-relaxed">
-      The multiplayer IPL auction simulator. Create a room, invite friends,
-      bid in real-time with voice chat, and build a championship T20 squad.
-    </motion.p>
-
-    <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-8">
-      <button
-        onClick={onCreate}
-        className="w-full sm:w-auto px-8 h-14 rounded-2xl bg-gradient-to-r from-[#ff5500] to-[#ff8c00] text-white font-black uppercase tracking-[0.2em] text-xs shadow-[0_10px_30px_rgba(255,85,0,0.25)] hover:shadow-[0_10px_40px_rgba(255,85,0,0.45)] transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2.5"
+  <div className="relative overflow-hidden">
+    {/* Ghost backdrop word */}
+    <div aria-hidden className="pointer-events-none select-none absolute inset-x-0 top-6 text-center font-black uppercase leading-none tracking-tighter text-[24vw] sm:text-[18vw] text-transparent opacity-100" style={{ WebkitTextStroke: '1px rgba(255,255,255,0.07)' }}>
+      Bid
+    </div>
+    <div className="text-center relative max-w-4xl mx-auto px-4 pt-14 sm:pt-20 pb-8">
+      <h1 className="sr-only">IPL Auction Simulator &amp; Game - Live IPL Mega Auction 2026</h1>
+      <motion.div
+        variants={itemVariants}
+        className="inline-flex items-center gap-2 border border-yellow-500/30 bg-yellow-500/5 text-yellow-500 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md mb-6 shadow-[0_0_20px_rgba(234,179,8,0.1)]"
       >
-        <Gavel size={17} /> Create Auction Room
-      </button>
-      <button
-        onClick={onJoin}
-        className="w-full sm:w-auto px-8 h-14 rounded-2xl bg-white/5 border border-white/10 text-gray-200 hover:text-white hover:bg-white/10 hover:border-white/20 font-black uppercase tracking-[0.2em] text-xs transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2.5"
-      >
-        <Zap size={17} /> Join with Code
-      </button>
-    </motion.div>
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500" />
+        </span>
+        Free Online IPL Game • 2026 Season
+      </motion.div>
 
-    <motion.div variants={itemVariants} className="flex items-center justify-center gap-5 sm:gap-8 mt-10 text-center">
-      {[
-        ['10', 'Franchises'],
-        ['500+', 'Players'],
-        ['3', 'Game Modes'],
-        ['Live', 'Bidding'],
-      ].map(([num, label]) => (
-        <div key={label}>
-          <p className="text-lg sm:text-2xl font-black text-white tracking-tight">{num}</p>
-          <p className="text-[8px] sm:text-[9px] font-bold text-gray-500 uppercase tracking-[0.2em] mt-0.5">{label}</p>
-        </div>
-      ))}
-    </motion.div>
+      <motion.p variants={itemVariants} className="text-[clamp(0.85rem,3vw,1.05rem)] font-extrabold tracking-[0.4em] text-gray-400 uppercase">
+        Play the
+      </motion.p>
+      <motion.h2 variants={itemVariants} className="text-[clamp(3rem,12vw,7.5rem)] font-black tracking-tighter text-white leading-[0.9] uppercase mt-2">
+        IPL Auction
+      </motion.h2>
+      <motion.div variants={itemVariants} className="text-[clamp(3rem,12vw,7.5rem)] font-black tracking-tighter leading-[0.9] uppercase italic bg-gradient-to-r from-[#ff5500] via-[#ff8c00] to-[#ff5500] bg-clip-text text-transparent drop-shadow-[0_4px_24px_rgba(255,85,0,0.3)]">
+        Simulator
+      </motion.div>
+
+      <motion.p variants={itemVariants} className="text-xs sm:text-base text-gray-400 font-medium max-w-xl mx-auto mt-6 leading-relaxed">
+        Host a <span className="text-gray-200 font-bold">live IPL mega auction game</span> with friends.
+        Bid in real-time, manage your <span className="text-gray-200 font-bold">₹120 Cr budget</span>,
+        talk over <span className="text-gray-200 font-bold">voice chat</span>, and build your dream franchise squad.
+      </motion.p>
+
+      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-8">
+        <button
+          onClick={onCreate}
+          className="w-full sm:w-auto px-8 h-14 rounded-2xl bg-gradient-to-r from-[#ff5500] to-[#ff8c00] text-white font-black uppercase tracking-[0.2em] text-xs shadow-[0_10px_30px_rgba(255,85,0,0.25)] hover:shadow-[0_10px_40px_rgba(255,85,0,0.45)] transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2.5"
+        >
+          <Gavel size={17} /> Create Auction Room
+        </button>
+        <button
+          onClick={onJoin}
+          className="w-full sm:w-auto px-8 h-14 rounded-2xl bg-white/5 border border-white/10 text-gray-200 hover:text-white hover:bg-white/10 hover:border-white/20 font-black uppercase tracking-[0.2em] text-xs transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2.5"
+        >
+          <Zap size={17} /> Join with Code
+        </button>
+      </motion.div>
+
+      <motion.div variants={itemVariants} className="flex items-center justify-center gap-5 sm:gap-8 mt-10 text-center">
+        {[
+          ['10', 'Franchises'],
+          ['500+', 'Players'],
+          ['3', 'Game Modes'],
+          ['Live', 'Bidding'],
+        ].map(([num, label]) => (
+          <div key={label}>
+            <p className="text-lg sm:text-2xl font-black text-white tracking-tight">{num}</p>
+            <p className="text-[8px] sm:text-[9px] font-bold text-gray-500 uppercase tracking-[0.2em] mt-0.5">{label}</p>
+          </div>
+        ))}
+      </motion.div>
+    </div>
   </div>
 );
+
+const FAQS = [
+  {
+    q: 'Is the IPL auction simulator free to play?',
+    a: 'Yes. The IPL Auction Hub simulator is completely free — sign in with Google or play as a guest, create a room and start bidding with friends in seconds.',
+  },
+  {
+    q: 'How do I play the IPL auction game online with friends?',
+    a: 'Create an auction room, pick your franchise and share the 6-letter room code. Friends join from any browser on mobile or desktop — no downloads needed — and bid live with built-in voice chat.',
+  },
+  {
+    q: 'How does bidding work in the IPL mega auction simulator?',
+    a: 'Each player starts at a base price with a live countdown timer. Every bid raises the price and resets the timer. The highest bidder when the timer hits zero wins the player, with a Rs 120 crore budget and max 8 overseas players per squad in Mega mode.',
+  },
+  {
+    q: 'Which teams and players are included?',
+    a: 'All 10 IPL franchises (MI, CSK, RCB, KKR, DC, PBKS, RR, SRH, GT, LSG) and 500+ players with roles, stats and base prices across Mega, Classic and Sprint modes.',
+  },
+  {
+    q: 'Do I need an account to play?',
+    a: 'No. You can join instantly as a guest with just a name, or sign in with Google to track your auction history across sessions.',
+  },
+];
+
+const Faq = () => {
+  const [open, setOpen] = useState(null);
+  return (
+    <motion.section
+      variants={itemVariants}
+      className="max-w-3xl mx-auto px-4 mt-16 scroll-mt-20"
+    >
+      <div className="text-center mb-8">
+        <p className="text-[10px] font-black text-[#ff5500] uppercase tracking-[0.35em] mb-2">Good to know</p>
+        <h2 className="text-2xl sm:text-4xl font-black tracking-tight uppercase">IPL auction game FAQs</h2>
+      </div>
+      <div className="space-y-3">
+        {FAQS.map((item, idx) => {
+          const isOpen = open === idx;
+          return (
+            <div
+              key={idx}
+              className={`rounded-2xl border transition-all duration-300 overflow-hidden ${isOpen ? 'bg-white/[0.05] border-white/15' : 'bg-white/[0.02] border-white/10 hover:border-white/20'}`}
+            >
+              <button
+                onClick={() => setOpen(isOpen ? null : idx)}
+                className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left cursor-pointer"
+              >
+                <span className="text-xs sm:text-sm font-black text-white uppercase tracking-wide">{item.q}</span>
+                <ChevronDown size={16} className={`text-gray-500 shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+              </button>
+              <AnimatePresence initial={false}>
+                {isOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: 'easeOut' }}
+                    className="overflow-hidden"
+                  >
+                    <p className="px-5 pb-5 text-xs sm:text-sm text-gray-400 font-medium leading-relaxed">{item.a}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          );
+        })}
+      </div>
+    </motion.section>
+  );
+};
 
 const LandingPage = () => {
   const [selectedTeam, setSelectedTeam] = useState('MI');
@@ -251,13 +330,22 @@ const LandingPage = () => {
   const { createRoom, joinRoomDb } = useAuction();
   const navigate = useNavigate();
 
-  // Check for URL errors (e.g., from being kicked)
+  // Check for URL errors (e.g., from being kicked) + shared room deep links (?room=CODE)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('error') === 'kicked') {
       setError('ACCESS DENIED: You have been removed from that hub by the host.');
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    const sharedRoom = params.get('room');
+    if (sharedRoom) {
+      setRoomCode(sharedRoom.toUpperCase());
+      setActiveTab('join');
+      // Let the page settle, then take them straight to the join form.
+      setTimeout(() => {
+        document.getElementById('play')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 700);
     }
   }, []);
 
@@ -435,8 +523,6 @@ const LandingPage = () => {
       animate="visible"
       className="relative min-h-[100dvh] pt-safe pb-safe bg-[#050505] font-sans text-white overflow-x-hidden"
     >
-      <GithubStarButton />
-
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-[10%] left-1/2 -translate-x-1/2 w-[70%] h-[420px] bg-orange-600/15 blur-[140px] rounded-full" />
         <div className="absolute top-[30%] -left-[10%] w-[35%] h-[35%] bg-blue-600/10 blur-[120px] rounded-full" />
@@ -821,8 +907,8 @@ const LandingPage = () => {
                                                         <div className="min-w-0 flex-1">
                                                           <h6 className="text-[10px] sm:text-[11px] font-black leading-tight truncate">{p?.name}</h6>
                                                           <div className="flex items-center gap-1.5">
-                                                            <span className="text-[7px] font-bold text-gray-500 uppercase">{p?.type}</span>
-                                                            {p?.country !== 'IND' && <Wifi size={8} className="text-purple-400 rotate-90 shrink-0" />}
+                                                        <span className="text-[7px] font-bold text-gray-500 uppercase">{p?.type}</span>
+                                                        {p?.country !== 'IND' && !/overseas/i.test(p?.type || '') && <Wifi size={8} className="text-purple-400 rotate-90 shrink-0" />}
                                                           </div>
                                                         </div>
                                                       </div>
@@ -946,6 +1032,8 @@ const LandingPage = () => {
             })}
           </div>
         </motion.section>
+
+        <Faq />
 
         {/* ─── Franchises ─── */}
         <motion.section variants={itemVariants} className="max-w-6xl mx-auto px-4 mt-16">

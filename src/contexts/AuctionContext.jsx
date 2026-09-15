@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { getDb, getFs, getServerTime, rtdb } from '../lib/firebase';
+import { auth, getDb, getFs, getServerTime, rtdb } from '../lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { getPlayers } from '../lib/players';
 import {
   ref,
@@ -507,25 +508,38 @@ export const AuctionProvider = ({ children }) => {
     }, 5000);
 
     // ─── Real Presence Logic ───
-    // Track online status in RTDB
+    // Track online status in RTDB. Writes only go out while BOTH the socket
+    // is connected AND our auth token is live — otherwise the server rejects
+    // with permission_denied (auth.uid == $userId fails before the token
+    // arrives, e.g. right after sign-in or on reconnects).
     const myPresenceRef = ref(rtdb, `auctions/${auctionId}/presence/${userId}`);
     const connectedRef = ref(rtdb, '.info/connected');
-    
+    let socketConnected = false;
+
+    const publishPresence = () => {
+      if (!socketConnected) return;
+      if (auth.currentUser?.uid !== userId) return;
+      set(myPresenceRef, {
+        online: true,
+        lastSeen: serverTimestampRtdb()
+      }).catch(() => {});
+      // When I disconnect, update this to offline
+      onDisconnect(myPresenceRef).set({
+        online: false,
+        lastSeen: serverTimestampRtdb()
+      }).catch(() => {});
+    };
+
     // Set presence status on connect/disconnect
     const unsubConnected = onValue(connectedRef, (snap) => {
-      if (snap.val() === true) {
-        // We're connected (or reconnected)! Do something and set onDisconnect
-        set(myPresenceRef, { 
-          online: true, 
-          lastSeen: serverTimestampRtdb() 
-        });
-        
-        // When I disconnect, update this to offline
-        onDisconnect(myPresenceRef).set({ 
-          online: false, 
-          lastSeen: serverTimestampRtdb() 
-        });
-      }
+      socketConnected = snap.val() === true;
+      if (socketConnected) publishPresence();
+    });
+
+    // …and (re)publish the moment auth becomes ready, covering the race
+    // where the socket connects before the fresh ID token arrives.
+    const unsubAuthPresence = onAuthStateChanged(auth, (u) => {
+      if (u?.uid === userId) publishPresence();
     });
 
     let currentRoomData = null;
@@ -694,13 +708,18 @@ export const AuctionProvider = ({ children }) => {
     return () => {
       clearTimeout(loadTimeout);
       unsubConnected();
+      unsubAuthPresence();
       unsubPresence();
       unsubAuction();
       unsubLive();
       unsubTeams();
       unsubMessages();
-      // Set offline on component unmount
-      set(myPresenceRef, { online: false, lastSeen: serverTimestampRtdb() });
+      // Set offline on component unmount — only while still signed in,
+      // otherwise the server rejects (and the onDisconnect hook set above
+      // already covers real disconnects).
+      if (auth.currentUser) {
+        set(myPresenceRef, { online: false, lastSeen: serverTimestampRtdb() }).catch(() => {});
+      }
       setCurrentAuction(null);
       setTeam(null);
       setRoomTeams([]);

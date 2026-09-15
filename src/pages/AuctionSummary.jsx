@@ -9,14 +9,13 @@ import {
   Users,
   Home,
   ChevronDown,
-  Share2,
   Wifi,
   History,
-  LayoutGrid,
   Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import FantasyDashboard from '../components/fantasy/FantasyDashboard';
+import SquadCard from '../components/SquadCard';
 
 const AuctionSummary = () => {
   const { id } = useParams();
@@ -37,15 +36,16 @@ const AuctionSummary = () => {
 
   // Derived Data
   const allSoldPlayers = useMemo(() => {
-    return roomTeams.flatMap(rt => 
+    return roomTeams.flatMap(rt =>
       (rt.squad || []).map(s => {
         const pid = typeof s === 'string' ? s : s.id;
         const bidVal = typeof s === 'string' ? 0 : s.bid;
         const teamInfo = TEAMS.find(t => t.id === rt.teamId);
         const pInfo = IPL_PLAYERS.find(p => p.id === pid);
-        return { 
-          ...pInfo, 
-          bidVal, 
+        return {
+          ...pInfo,
+          role: (typeof s !== 'string' && s.role) || pInfo?.role,
+          bidVal,
           teamName: teamInfo?.name, 
           teamId: rt.teamId, 
           teamColor: teamInfo?.color,
@@ -265,7 +265,7 @@ const AuctionSummary = () => {
                            <img src={t.logo} alt="" decoding="async" loading="lazy" className="w-full h-full object-contain" />
                         </div>
                         <div className="text-left min-w-0">
-                          <h3 className="text-lg sm:text-2xl font-black uppercase tracking-tighter group-hover:text-orange-500 transition-colors truncate">{t.name}</h3>
+                           <h3 className="text-lg sm:text-2xl font-black uppercase tracking-tighter group-hover:text-orange-500 transition-colors truncate">{teamDoc?.customName || t.name}</h3>
                           <p className="text-[9px] sm:text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] sm:tracking-[0.4em] leading-none mt-1 truncate">Managed by {manager?.name || 'N/A'}</p>
                         </div>
                       </div>
@@ -302,73 +302,14 @@ const AuctionSummary = () => {
                           exit={{ height: 0, opacity: 0 }}
                           className="overflow-hidden px-2 sm:px-4 md:px-8 mb-4"
                         >
-                          <div className="bg-white/[0.02] border-x border-b border-white/5 rounded-b-2xl sm:rounded-b-[3rem] p-4 sm:p-8 space-y-6 sm:space-y-12">
-                            {['Batsman', 'Wicket-Keeper', 'All-Rounder', 'Bowler'].map(role => {
-                              const rolePlayers = squad.filter(p => p.role === role);
-                              if (rolePlayers.length === 0) return null;
-
-                              return (
-                                <div key={role} className="space-y-3 sm:space-y-6">
-                                  <div className="flex items-center gap-3 sm:gap-4">
-                                    <h4 className="text-[9px] sm:text-[10px] font-black text-orange-500 uppercase tracking-[0.2em] sm:tracking-[0.4em]">{role}s</h4>
-                                    <div className="flex-1 h-px bg-orange-500/20" />
-                                    <span className="text-[9px] sm:text-[10px] font-black text-gray-600">{rolePlayers.length} Members</span>
-                                  </div>
-                                  
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4">
-                                    {rolePlayers.map((p, pidx) => (
-                                      <motion.div 
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: pidx * 0.04 }}
-                                        key={p.id} 
-                                        className="bg-white/5 border border-white/10 p-2.5 sm:p-4 rounded-2xl sm:rounded-3xl flex items-center justify-between group/p hover:bg-white/10 transition-all"
-                                      >
-                                        <div className="flex items-center gap-3 min-w-0">
-                                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-black/40 border border-white/10 rounded-xl p-1 shrink-0 overflow-hidden">
-                                            <img 
-                                              src={p.image} 
-                                              alt={p.name}
-                                              decoding="async"
-                                              loading="lazy"
-                                              onError={(e) => {
-                                                e.target.onerror = null;
-                                                e.target.src = 'https://api.dicebear.com/7.x/initials/svg?seed=' + encodeURIComponent(p.name || 'Player');
-                                              }}
-                                              className="w-full h-full object-cover" 
-                                            />
-                                          </div>
-                                          <div className="overflow-hidden min-w-0">
-                                            <h5 className="text-[11px] sm:text-[12px] font-black uppercase tracking-tight truncate">{p.name}</h5>
-                                            <div className="flex items-center gap-1.5">
-                                              <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">{p.type}</span>
-                                              {p.country !== 'IND' && <Wifi size={10} className="text-purple-400 rotate-90 shrink-0" />}
-                                            </div>
-                                          </div>
-                                        </div>
-                                        <div className="text-right shrink-0">
-                                          <div className="text-[13px] sm:text-[14px] font-black text-green-500">₹{p.bid.toFixed(2)}Cr</div>
-                                        </div>
-                                      </motion.div>
-                                    ))}
-                                  </div>
-                                </div>
-                              );
-                            })}
-
-                            {/* Summary Footer for Team */}
-                            <div className="pt-4 sm:pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4 opacity-70 hover:opacity-100 transition-opacity">
-                               <div className="flex items-center gap-3">
-                                  <LayoutGrid size={14} className="text-gray-600" />
-                                  <p className="text-[8px] sm:text-[9px] font-black text-gray-600 uppercase tracking-[0.3em] sm:tracking-[0.5em]">Composition Verified by Arena Engine</p>
-                               </div>
-                               <div className="flex gap-4">
-                                  <button className="flex items-center gap-2 text-[9px] font-black uppercase text-gray-400 hover:text-orange-500 transition-colors touch-manipulation">
-                                     <Share2 size={12} /> Share Squad
-                                  </button>
-                               </div>
-                            </div>
-                          </div>
+                           <div className="bg-white/[0.02] border-x border-b border-white/5 rounded-b-2xl sm:rounded-b-[3rem] p-4 sm:p-6">
+                             <SquadCard
+                               t={t}
+                               teamDoc={teamDoc}
+                               managerName={manager?.name}
+                               totalBudget={currentAuction?.settings?.budget || 120}
+                             />
+                           </div>
                         </motion.div>
                       )}
                     </AnimatePresence>

@@ -38,8 +38,9 @@ import {
    ShieldAlert,
     Trophy,
     Clock,
-    LogOut
- } from 'lucide-react';
+     LogOut,
+     MoreVertical
+  } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { TEAMS } from '../data/teams';
@@ -47,6 +48,7 @@ import TextChat from '../components/TextChat';
 import VoiceChat from '../components/VoiceChat';
 import AuctionMiniBar from '../components/AuctionMiniBar';
 import MiniChat from '../components/MiniChat';
+import ShareSheet from '../components/ShareSheet';
 import PageLoader from '../components/PageLoader';
 
 const AuctionRoom = () => {
@@ -88,6 +90,8 @@ const AuctionRoom = () => {
     const [voiceJoined, setVoiceJoined] = useState(false);
     const [unreadChat, setUnreadChat] = useState(0);
     const [miniChatOpen, setMiniChatOpen] = useState(false);
+    const [showShare, setShowShare] = useState(false);
+    const [showMore, setShowMore] = useState(false);
     const prevChatCountRef = useRef(0);
 
     // Unread chat badge: counts chat messages arriving while Chat is closed.
@@ -1186,87 +1190,171 @@ const AuctionRoom = () => {
       <div className="h-dvh bg-[#0d0d0d] text-white font-sans flex flex-col items-center overflow-hidden">
 
          <header className="w-full min-h-14 h-auto md:h-14 bg-black/40 backdrop-blur-md border-b border-white/5 flex flex-row items-center justify-between px-3 md:px-6 py-2 md:py-0 z-50 gap-2">
-            <div className="flex items-center gap-2 md:gap-6 min-w-0">
-               <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
-                  <span className="text-gray-500 text-[10px] font-black uppercase tracking-widest">ID:</span>
-                  <span className="text-white font-mono font-bold tracking-widest text-[11px] sm:text-sm truncate">{id}</span>
-               </div>
-               <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full shrink-0" title="Connected Users">
-                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                  <span className="text-[10px] font-black text-gray-300">{currentAuction?.players?.length || 1}/10</span>
-               </div>
-               <div className="hidden min-[400px]:flex items-center gap-2 border-l border-white/10 pl-3 sm:pl-6 h-6 shrink-0">
-                  <button onClick={copyRoomId} aria-label="Copy room ID" className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center bg-white/5 text-gray-400 rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
-                     {copied ? <CheckCircle2 size={14} className="text-green-500" /> : <Copy size={14} />}
-                  </button>
-               </div>
-            </div>
+             <div className="flex items-center gap-2 min-w-0">
+                <button
+                   onClick={copyRoomId}
+                   title="Copy room code"
+                   className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl pl-3 pr-2.5 py-2 transition-all cursor-pointer active:scale-95 min-w-0"
+                >
+                   <span className="text-gray-500 text-[10px] font-black uppercase tracking-widest">Room</span>
+                   <span className="text-white font-mono font-bold tracking-[0.2em] text-xs sm:text-sm truncate">{id}</span>
+                   {copied ? <CheckCircle2 size={13} className="text-green-500 shrink-0" /> : <Copy size={13} className="text-gray-500 shrink-0" />}
+                </button>
+                {(() => {
+                   const st = displayAuctionState?.status;
+                   const meta = st === 'bidding'
+                      ? { label: 'Live', dot: 'bg-green-500 animate-pulse', text: 'text-green-400' }
+                      : st === 'paused'
+                         ? { label: 'Paused', dot: 'bg-amber-400', text: 'text-amber-400' }
+                         : st === 'sold'
+                            ? { label: 'Sold', dot: 'bg-blue-500', text: 'text-blue-400' }
+                            : st === 'unsold'
+                               ? { label: 'Unsold', dot: 'bg-gray-500', text: 'text-gray-400' }
+                               : null;
+                   if (!meta) return null;
+                   return (
+                      <div className="hidden min-[420px]:flex items-center gap-1.5 shrink-0">
+                         <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+                         <span className={`text-[10px] font-black uppercase tracking-widest ${meta.text}`}>{meta.label}</span>
+                      </div>
+                   );
+                })()}
+                <div className="hidden sm:flex items-center gap-1.5 bg-white/5 border border-white/10 px-2.5 py-1.5 rounded-full shrink-0" title="Connected managers">
+                   <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                   <span className="text-[10px] font-black text-gray-300">{currentAuction?.players?.length || 1}/10</span>
+                </div>
+             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-               {isAdmin && (
-                  <div className="flex items-center gap-1.5">
-                     {displayAuctionState?.status === 'paused' ? (
-                        <button
-                           onClick={() => resumeAuction(id)}
-                           aria-label="Resume auction"
-                           className="flex items-center justify-center gap-1.5 bg-white/5 border border-white/10 p-2.5 min-w-[44px] min-h-[44px] rounded-lg text-gray-300 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all cursor-pointer"
-                        >
-                           <PlayCircle size={14} /> <span className="hidden lg:inline">Resume</span>
-                        </button>
-                     ) : (
-                        <button
-                           onClick={() => pauseAuction(id)}
-                           aria-label="Pause auction"
-                           className="flex items-center justify-center gap-1.5 bg-white/5 border border-white/10 p-2.5 min-w-[44px] min-h-[44px] rounded-lg text-gray-300 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all cursor-pointer"
-                        >
-                           <Pause size={14} /> <span className="hidden lg:inline">Pause</span>
-                        </button>
-                     )}
-                     <button
-                        onClick={() => endAuction(id)}
-                        aria-label="End auction"
-                        className="flex items-center justify-center gap-1.5 bg-white/5 border border-white/10 p-2.5 min-w-[44px] min-h-[44px] rounded-lg text-gray-300 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/20 transition-all cursor-pointer"
-                     >
-                        <XCircle size={14} /> <span className="hidden lg:inline">End</span>
-                     </button>
-                     <button
-                        onClick={() => setShowParticipantsOverlay(true)}
-                        aria-label="Participants"
-                        className="flex items-center justify-center gap-1.5 bg-white/5 border border-white/10 p-2.5 min-w-[44px] min-h-[44px] rounded-lg text-gray-300 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all cursor-pointer"
-                     >
-                        <Users size={14} /> <span className="hidden lg:inline">Participants</span>
-                     </button>
-                  </div>
-               )}
-               <div className="flex items-center gap-1 border-l border-white/10 pl-2 h-6">
-                  <button
-                     onClick={() => {
-                        const newTtsVal = !isTtsEnabled;
-                        setIsTtsEnabled(newTtsVal);
-                        if (!newTtsVal) {
-                           stopSpeech();
-                        } else {
-                           warmUpVoiceEngine();
-                           setTimeout(() => speak("Voice auctioneer, enabled.", true), 250);
-                        }
-                     }}
-                     className={`p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg border transition-all cursor-pointer ${isTtsEnabled ? 'bg-white/10 border-white/20 text-white shadow-sm' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
-                     title={isTtsEnabled ? "Mute Voice Auctioneer" : "Enable Voice Auctioneer"}
-                  >
-                     <Gavel size={16} />
-                  </button>
-                  <button
-                     onClick={() => setShowSettings(!showSettings)}
-                     aria-label="Settings"
-                     className={`p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg border transition-all cursor-pointer ${showSettings ? 'bg-white/10 border-white/20 text-white shadow-sm' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
-                     title="Local & Room Settings"
-                  >
-                     <SettingsIcon size={16} />
-                  </button>
-                  <button onClick={() => navigate('/')} aria-label="Home" className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors cursor-pointer"><Home size={16} /></button>
-                  <button onClick={logout} aria-label="Logout" className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-red-500/20 rounded-lg text-gray-400 hover:text-red-400 cursor-pointer transition-colors" title="Logout"><LogOut size={16} /></button>
-               </div>
-            </div>
+             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                <button
+                   onClick={() => setShowShare(true)}
+                   aria-label="Invite friends"
+                   className="flex items-center justify-center gap-1.5 bg-[#ff5500]/10 border border-[#ff5500]/25 p-2.5 min-w-[44px] min-h-[44px] rounded-xl text-[#ff5500] text-[10px] font-black uppercase tracking-widest hover:bg-[#ff5500]/20 hover:text-white transition-all cursor-pointer active:scale-95"
+                   title="Invite friends"
+                >
+                   <Share2 size={14} /> <span className="hidden lg:inline">Invite</span>
+                </button>
+                {isAdmin && (
+                   <>
+                      {displayAuctionState?.status === 'paused' ? (
+                         <button
+                            onClick={() => resumeAuction(id)}
+                            aria-label="Resume auction"
+                            className="flex items-center justify-center gap-1.5 bg-green-500/10 border border-green-500/25 p-2.5 min-w-[44px] min-h-[44px] rounded-xl text-green-400 text-[10px] font-black uppercase tracking-widest hover:bg-green-500/20 hover:text-white transition-all cursor-pointer active:scale-95"
+                         >
+                            <PlayCircle size={14} /> <span className="hidden lg:inline">Resume</span>
+                         </button>
+                      ) : (
+                         <button
+                            onClick={() => pauseAuction(id)}
+                            aria-label="Pause auction"
+                            className="flex items-center justify-center gap-1.5 bg-white/5 border border-white/10 p-2.5 min-w-[44px] min-h-[44px] rounded-xl text-gray-300 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all cursor-pointer active:scale-95"
+                         >
+                            <Pause size={14} /> <span className="hidden lg:inline">Pause</span>
+                         </button>
+                      )}
+                      <button
+                         onClick={() => { if (window.confirm('End the auction for everyone?')) endAuction(id); }}
+                         aria-label="End auction"
+                         className="hidden sm:flex items-center justify-center gap-1.5 bg-white/5 border border-white/10 p-2.5 min-w-[44px] min-h-[44px] rounded-xl text-gray-300 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/20 transition-all cursor-pointer active:scale-95"
+                      >
+                         <XCircle size={14} /> <span className="hidden lg:inline">End</span>
+                      </button>
+                   </>
+                )}
+                <div className="relative">
+                   <button
+                      onClick={() => setShowMore((v) => !v)}
+                      aria-label="More options"
+                      className={`p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl border transition-all cursor-pointer active:scale-95 ${showMore ? 'bg-white/10 border-white/20 text-white' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white'}`}
+                   >
+                      <MoreVertical size={16} />
+                   </button>
+                   <AnimatePresence>
+                      {showMore && (
+                         <>
+                            <div className="fixed inset-0 z-[60] cursor-default" onClick={() => setShowMore(false)} />
+                            <motion.div
+                               initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                               animate={{ opacity: 1, y: 0, scale: 1 }}
+                               exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                               transition={{ duration: 0.15 }}
+                               className="absolute right-0 top-12 z-[70] w-60 rounded-2xl bg-[#111]/98 backdrop-blur-2xl border border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.7)] p-2"
+                            >
+                               <p className="px-3 pt-2 pb-1 text-[8px] font-black text-gray-600 uppercase tracking-[0.25em]">Room</p>
+                               <button
+                                  onClick={() => { setShowShare(true); setShowMore(false); }}
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-300 hover:bg-white/5 hover:text-white transition-all cursor-pointer"
+                               >
+                                  <Share2 size={15} className="text-[#ff5500]" />
+                                  <span className="text-[11px] font-black uppercase tracking-widest">Invite friends</span>
+                               </button>
+                               <button
+                                  onClick={() => { setShowParticipantsOverlay(true); setShowMore(false); }}
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-300 hover:bg-white/5 hover:text-white transition-all cursor-pointer"
+                               >
+                                  <Users size={15} className="text-blue-400" />
+                                  <span className="text-[11px] font-black uppercase tracking-widest">Participants</span>
+                               </button>
+                               <button
+                                  onClick={() => { copyRoomId(); setShowMore(false); }}
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-300 hover:bg-white/5 hover:text-white transition-all cursor-pointer"
+                               >
+                                  {copied ? <CheckCircle2 size={15} className="text-green-500" /> : <Copy size={15} className="text-gray-500" />}
+                                  <span className="text-[11px] font-black uppercase tracking-widest">{copied ? 'Code copied!' : 'Copy room code'}</span>
+                               </button>
+                               <p className="px-3 pt-2 pb-1 text-[8px] font-black text-gray-600 uppercase tracking-[0.25em]">Sound & view</p>
+                               <button
+                                  onClick={() => {
+                                     const next = !isTtsEnabled;
+                                     setIsTtsEnabled(next);
+                                     if (!next) stopSpeech();
+                                     else { warmUpVoiceEngine(); setTimeout(() => speak('Voice auctioneer, enabled.', true), 250); }
+                                     setShowMore(false);
+                                  }}
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-300 hover:bg-white/5 hover:text-white transition-all cursor-pointer"
+                               >
+                                  <Gavel size={15} className={isTtsEnabled ? 'text-green-400' : 'text-gray-500'} />
+                                  <span className="text-[11px] font-black uppercase tracking-widest flex-1 text-left">Auctioneer voice</span>
+                                  <span className={`text-[9px] font-black uppercase ${isTtsEnabled ? 'text-green-400' : 'text-gray-600'}`}>{isTtsEnabled ? 'On' : 'Off'}</span>
+                               </button>
+                               <button
+                                  onClick={() => { setShowSettings((v) => !v); setShowMore(false); }}
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-300 hover:bg-white/5 hover:text-white transition-all cursor-pointer"
+                               >
+                                  <SettingsIcon size={15} className="text-gray-400" />
+                                  <span className="text-[11px] font-black uppercase tracking-widest">Settings</span>
+                               </button>
+                               <div className="h-px bg-white/5 my-1" />
+                               <button
+                                  onClick={() => navigate('/')}
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-300 hover:bg-white/5 hover:text-white transition-all cursor-pointer"
+                               >
+                                  <Home size={15} className="text-gray-400" />
+                                  <span className="text-[11px] font-black uppercase tracking-widest">Exit to home</span>
+                               </button>
+                               <button
+                                  onClick={() => logout()}
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-400/80 hover:bg-red-500/10 hover:text-red-400 transition-all cursor-pointer"
+                               >
+                                  <LogOut size={15} />
+                                  <span className="text-[11px] font-black uppercase tracking-widest">Logout</span>
+                               </button>
+                               {isAdmin && (
+                                  <button
+                                     onClick={() => { setShowMore(false); if (window.confirm('End the auction for everyone?')) endAuction(id); }}
+                                     className="sm:hidden w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-400/80 hover:bg-red-500/10 hover:text-red-400 transition-all cursor-pointer"
+                                  >
+                                     <XCircle size={15} />
+                                     <span className="text-[11px] font-black uppercase tracking-widest">End auction</span>
+                                  </button>
+                               )}
+                            </motion.div>
+                         </>
+                      )}
+                   </AnimatePresence>
+                </div>
+             </div>
          </header>
 
          <div className="w-full flex flex-col md:flex-row flex-1 overflow-hidden relative">
@@ -1475,7 +1563,7 @@ const AuctionRoom = () => {
                                            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2 md:mb-4">
                                               <span className="bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[8px] md:text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest">{currentPlayer.role}</span>
                                               <span className="bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[8px] md:text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest">{currentPlayer.type}</span>
-                                              {currentPlayer.country && currentPlayer.country !== 'IND' && (
+                                              {currentPlayer.country && currentPlayer.country !== 'IND' && !/overseas/i.test(currentPlayer.type || '') && (
                                                  <span className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[8px] md:text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest">✈ Overseas</span>
                                               )}
                                               <span className="bg-white/5 border border-white/10 text-gray-400 text-[8px] md:text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest">Base ₹{(currentPlayer.basePrice || 0).toFixed(2)} Cr</span>
@@ -1754,6 +1842,15 @@ const AuctionRoom = () => {
           </div>
 
           <MiniChat roomId={id} open={miniChatOpen} setOpen={setMiniChatOpen} unread={unreadChat} />
+
+          {showShare && (
+            <ShareSheet
+              roomId={id}
+              modeLabel={currentAuction?.auctionType === 'sprint5' ? '5-Player Sprint' : currentAuction?.auctionType === 'sprint11' ? '11-Player Classic' : 'Mega Auction'}
+              hostName={currentAuction?.players?.find(p => p.isHost)?.name || ''}
+              onClose={() => setShowShare(false)}
+            />
+          )}
 
           <AnimatePresence>
              {showPlayersOverlay && (
