@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowUpRight, ShieldCheck, Mail, Cpu, Award } from 'lucide-react';
+import { ArrowUpRight, Mail, Cpu } from 'lucide-react';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -14,106 +14,119 @@ const Footer = () => {
   const techStack = [
     { name: "React & Vite", href: "https://vite.dev" },
     { name: "Tailwind CSS", href: "https://tailwindcss.com" },
-    { name: "Firebase Firestore", href: "https://firebase.google.com" },
+    { name: "Firebase", href: "https://firebase.google.com" },
     { name: "Framer Motion", href: "https://motion.dev" }
   ];
 
   return (
-    <footer className="mt-32 w-full max-w-6xl mx-auto px-6 border-t border-white/5 pt-16 pb-12 z-10 relative">
-      {/* Background glow effects inside footer area */}
+    <footer className="mt-24 w-full relative z-10 overflow-hidden">
+      {/* Glow accents */}
       <div className="absolute top-0 left-1/4 -translate-y-1/2 w-72 h-72 bg-orange-600/5 blur-[120px] rounded-full pointer-events-none" />
       <div className="absolute top-0 right-1/4 -translate-y-1/2 w-72 h-72 bg-blue-600/5 blur-[120px] rounded-full pointer-events-none" />
 
-      <div className="grid grid-cols-1 sm:grid-cols-12 gap-10 md:gap-8 pb-12">
-        {/* Brand / Intro */}
-        <div className="col-span-1 sm:col-span-12 md:col-span-6 space-y-4">
-          <div className="flex items-center gap-2">
-       
-            <span className="text-sm font-black tracking-[0.2em] uppercase text-white bg-clip-text">
-              IPL Auction Hub
-            </span>
-          </div>
-          <p className="text-xs text-gray-500 leading-relaxed font-medium pr-4">
-            The ultimate real-time multiplayer IPL auction simulator. Build your dream franchise squad, manage team budget and overseas slots, and compete dynamically in live bidding wars.
-          </p>
-          {/* Social Icons */}
-          <div className="flex gap-3 pt-2">
-            {socialLinks.map((social) => (
-              <motion.a
-                key={social.label}
-                href={social.href}
+      <div className="max-w-6xl mx-auto px-6">
+        {/* Top row: brand + link columns */}
+        <div className="grid grid-cols-1 sm:grid-cols-12 gap-10 md:gap-8 pt-14 pb-12 border-t border-white/5">
+          <div className="col-span-1 sm:col-span-12 md:col-span-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-black tracking-[0.2em] uppercase text-white">
+                IPL Auction Hub
+              </span>
+              <a
+                href="https://auction.vijayaapardhu.dev"
                 target="_blank"
                 rel="noopener noreferrer"
-                whileHover={{ y: -3, scale: 1.05, backgroundColor: "rgba(255, 255, 255, 0.08)", borderColor: "rgba(255, 255, 255, 0.2)" }}
-                whileTap={{ scale: 0.95 }}
-                className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-center text-gray-500 hover:text-white transition-all duration-300"
-                title={social.label}
+                className="text-gray-600 hover:text-[#ff5500] transition-colors"
+                title="auction.vijayaapardhu.dev"
               >
-                {social.icon}
-              </motion.a>
-            ))}
-          </div>
-        </div>
-
-        {/* Tech Stack */}
-        <div className="col-span-1 sm:col-span-6 md:col-span-3 space-y-4">
-          <h4 className="text-[10px] font-black text-gray-600 uppercase tracking-[0.3em]">Built With</h4>
-          <ul className="space-y-2">
-            {techStack.map((tech) => (
-              <li key={tech.name}>
-                <a
-                  href={tech.href}
+                <ArrowUpRight size={14} />
+              </a>
+            </div>
+            <p className="text-xs text-gray-500 leading-relaxed font-medium max-w-sm">
+              The real-time multiplayer IPL auction simulator. Build your dream franchise squad,
+              manage budgets and overseas slots, and outbid your friends live.
+            </p>
+            <div className="flex gap-3 pt-2">
+              {socialLinks.map((social) => (
+                <motion.a
+                  key={social.label}
+                  href={social.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-gray-500 hover:text-white font-bold uppercase tracking-wider transition-colors duration-200 flex items-center gap-1 group"
+                  whileHover={{ y: -3, scale: 1.05, backgroundColor: "rgba(255, 255, 255, 0.08)", borderColor: "rgba(255, 255, 255, 0.2)" }}
+                  whileTap={{ scale: 0.95 }}
+                  className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-center text-gray-500 hover:text-white transition-all duration-300"
+                  title={social.label}
                 >
-                  {tech.name}
-                  <Cpu size={10} className="text-gray-700 group-hover:text-white transition-colors duration-200" />
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
+                  {social.icon}
+                </motion.a>
+              ))}
+            </div>
+          </div>
 
-        {/* Developer Info */}
-        <div className="col-span-1 sm:col-span-6 md:col-span-3 space-y-4">
-          <h4 className="text-[10px] font-black text-gray-600 uppercase tracking-[0.3em]">Developer</h4>
-          <div className="space-y-2">
-            <a
-              href="https://vijayaapardhu.dev"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block group"
-            >
-              <span className="text-xs font-black text-gray-400 group-hover:text-white transition-colors uppercase tracking-widest block">
-                Vijaya Pardhu
-              </span>
-              <span className="text-[9px] font-bold text-gray-600 uppercase tracking-widest block">
-                Software Engineer
-              </span>
-            </a>
-            <div className="pt-1">
+          <div className="col-span-1 sm:col-span-6 md:col-span-3 space-y-4">
+            <h4 className="text-[10px] font-black text-gray-600 uppercase tracking-[0.3em]">Built With</h4>
+            <ul className="space-y-2">
+              {techStack.map((tech) => (
+                <li key={tech.name}>
+                  <a
+                    href={tech.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-gray-500 hover:text-white font-bold uppercase tracking-wider transition-colors duration-200 flex items-center gap-1 group w-fit"
+                  >
+                    {tech.name}
+                    <Cpu size={10} className="text-gray-700 group-hover:text-white transition-colors duration-200" />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="col-span-1 sm:col-span-6 md:col-span-3 space-y-4">
+            <h4 className="text-[10px] font-black text-gray-600 uppercase tracking-[0.3em]">Developer</h4>
+            <div className="space-y-2">
               <a
-                href="mailto:vijaypardhu17@gmail.com"
-                className="text-[10px] font-bold text-gray-500 hover:text-white uppercase tracking-widest flex items-center gap-1.5 transition-colors"
+                href="https://vijayaapardhu.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block group w-fit"
               >
-                <Mail size={12} /> Email Me
+                <span className="text-xs font-black text-gray-400 group-hover:text-white transition-colors uppercase tracking-widest block">
+                  Vijaya Pardhu
+                </span>
+                <span className="text-[9px] font-bold text-gray-600 uppercase tracking-widest block">
+                  Software Engineer
+                </span>
               </a>
+              <div className="pt-1">
+                <a
+                  href="mailto:vijaypardhu17@gmail.com"
+                  className="text-[10px] font-bold text-gray-500 hover:text-white uppercase tracking-widest flex items-center gap-1.5 transition-colors"
+                >
+                  <Mail size={12} /> Email Me
+                </a>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Divider */}
-      <div className="w-full h-px bg-white/5 mb-8" />
-
-      {/* Bottom Row */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest text-center sm:text-left leading-relaxed">
-          &copy; {currentYear} IPL Auction Hub. All rights reserved. 🏏
+      {/* ── Wordmark ── */}
+      <div aria-hidden className="select-none pointer-events-none px-2">
+        <p className="text-center font-black uppercase leading-[0.85] tracking-tighter text-[15.5vw] lg:text-[11rem] bg-gradient-to-b from-white/[0.13] to-white/[0.02] bg-clip-text text-transparent whitespace-nowrap">
+          Auction Hub
         </p>
-        <div className="flex items-center gap-2.5">
-          <ShieldCheck size={12} className="text-[#ff5500]/70" />
+        <p className="text-center font-black uppercase leading-none tracking-[0.45em] text-[3.4vw] lg:text-2xl text-transparent pb-6 -mt-1 sm:-mt-2" style={{ WebkitTextStroke: '1px rgba(255,85,0,0.35)' }}>
+          IPL Simulator
+        </p>
+      </div>
+
+      <div className="border-t border-white/5">
+        <div className="max-w-6xl mx-auto px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest text-center sm:text-left leading-relaxed">
+            &copy; {currentYear} IPL Auction Hub • auction.vijayaapardhu.dev 🏏
+          </p>
           <span className="text-[9px] font-black text-gray-600 uppercase tracking-[0.2em] leading-none">
             Secure Realtime Sync Enabled
           </span>
