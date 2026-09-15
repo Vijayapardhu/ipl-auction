@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://crickauction.in/sitemap.xml
+Sitemap: https://auction.vijayaapardhu.dev/sitemap.xml
