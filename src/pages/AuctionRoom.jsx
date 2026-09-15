@@ -190,46 +190,112 @@ const AuctionRoom = () => {
       }
    };
 
-   // Curated list of high-quality, natural-sounding English voice patterns
-   const getVoiceLabel = (name) => {
-      const cleanName = name.toLowerCase();
-      if (cleanName.includes("neerja")) return "Neerja (Authentic Indian Female)";
-      if (cleanName.includes("aria")) return "Aria (Natural)";
-      if (cleanName.includes("jenny")) return "Jenny (Natural Female)";
-      if (cleanName.includes("guy")) return "Guy (Natural Male)";
-      if (cleanName.includes("rishi")) return "Rishi (Authentic Indian Male)";
-      if (cleanName.includes("daniel")) return "Daniel (Classic UK Auctioneer)";
-      if (cleanName.includes("david")) return "David (Professional Deep Male)";
-      if (cleanName.includes("samantha")) return "Samantha (Natural US Female)";
-      if (cleanName.includes("google us")) return "Google US English (Clear)";
-      if (cleanName.includes("google uk male")) return "Google UK Male (Sleek)";
-      if (cleanName.includes("google uk female")) return "Google UK Female (Refined)";
+    // Friendly display names for known high-quality voices.
+    // Falls back to a cleaned-up engine name plus a region tag (e.g. Indian English).
+    const getVoiceLabel = (voiceOrName, lang = '') => {
+       const name = typeof voiceOrName === 'string' ? voiceOrName : (voiceOrName?.name || '');
+       const locale = (typeof voiceOrName === 'object' && voiceOrName?.lang) ? voiceOrName.lang : lang;
+       const cleanName = name.toLowerCase();
+       const padded = ` ${cleanName} `;
 
-      return name.replace("Microsoft", "").replace("Google", "").replace("Desktop", "").replace("Natural", "").trim();
-   };
+       const KNOWN_LABELS = [
+          ["neerja", "Neerja (Authentic Indian Female)"],
+          ["swara", "Swara (Indian Female)"],
+          ["prabhat", "Prabhat (Indian Male)"],
+          ["lekha", "Lekha (Indian Female)"],
+          ["veena", "Veena (Indian Female)"],
+          ["rishi", "Rishi (Authentic Indian Male)"],
+          ["aria", "Aria (Natural)"],
+          ["jenny", "Jenny (Natural Female)"],
+          ["guy", "Guy (Natural Male)"],
+          [" ana ", "Ana (Natural Female)"],
+          [" ava ", "Ava (Natural Female)"],
+          ["andrew", "Andrew (Natural Male)"],
+          ["brian", "Brian (Natural Male)"],
+          ["christopher", "Christopher (Natural Male)"],
+          ["emma", "Emma (Natural Female)"],
+          ["eric", "Eric (Natural Male)"],
+          ["michelle", "Michelle (Natural Female)"],
+          ["roger", "Roger (Natural Male)"],
+          ["steffan", "Steffan (Natural Male)"],
+          ["samantha", "Samantha (Natural US Female)"],
+          ["daniel", "Daniel (Classic UK Auctioneer)"],
+          ["david", "David (Professional Deep Male)"],
+          ["karen", "Karen (Australian Female)"],
+          ["moira", "Moira (Irish Female)"],
+          ["tessa", "Tessa (South African Female)"],
+          ["zira", "Zira (US Female)"],
+          [" mark ", "Mark (US Male)"],
+          ["google us", "Google US English (Clear)"],
+          ["google uk male", "Google UK Male (Sleek)"],
+          ["google uk female", "Google UK Female (Refined)"],
+       ];
 
-   // Fetch browser English voices (curated list of 3-5 real-sounding voices)
+       for (const [pattern, label] of KNOWN_LABELS) {
+          // Padded patterns (e.g. " ana ") match whole words only,
+          // so "Ana" never collides with "Samantha".
+          if (pattern.startsWith(' ')) {
+             if (padded.includes(pattern)) return label;
+          } else if (cleanName.includes(pattern)) {
+             return label;
+          }
+        }
+
+        const base = name
+          .replace("Microsoft", "").replace("Google", "").replace("Desktop", "")
+          .replace("Natural", "").replace("Online", "")
+          .replace(/\(.*?\)/g, "").replace(/- English.*$/i, "").trim() || name;
+       const region = locale.startsWith('en-IN') ? ' · Indian English'
+          : locale.startsWith('en-GB') ? ' · UK'
+          : locale.startsWith('en-US') ? ' · US'
+          : locale.startsWith('en-AU') ? ' · Australian'
+          : '';
+       return `${base}${region}`;
+    };
+
+    // Fetch browser English voices (curated list of up to 12 natural-sounding voices)
    useEffect(() => {
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
          const updateVoices = () => {
             const voices = window.speechSynthesis.getVoices();
 
-            const targetPatterns = [
-               "Google US English",
-               "Google UK English Male",
-               "Google UK English Female",
-               "Microsoft Aria",
-               "Microsoft Jenny",
-               "Microsoft Guy",
-               "Neerja",
-               "Rishi",
-               "Natural",
-               "Online",
-               "Neural",
-               "Samantha",
-               "Daniel",
-               "Microsoft David"
-            ];
+             const targetPatterns = [
+                "Google US English",
+                "Google UK English Male",
+                "Google UK English Female",
+                "Microsoft Aria",
+                "Microsoft Jenny",
+                "Microsoft Guy",
+                "Microsoft Ana",
+                "Microsoft Ava",
+                "Microsoft Andrew",
+                "Microsoft Brian",
+                "Microsoft Christopher",
+                "Microsoft Emma",
+                "Microsoft Eric",
+                "Microsoft Michelle",
+                "Microsoft Roger",
+                "Microsoft Steffan",
+                "Neerja",
+                "Swara",
+                "Prabhat",
+                "Rishi",
+                "Lekha",
+                "Veena",
+                "Natural",
+                "Online",
+                "Neural",
+                "Samantha",
+                "Daniel",
+                "Microsoft David",
+                "Microsoft Mark",
+                "Zira",
+                "Karen",
+                "Moira",
+                "Tessa",
+                "Alex",
+                "Fred"
+             ];
 
             let filtered = voices.filter(v =>
                v.lang.startsWith('en') &&
@@ -240,38 +306,46 @@ const AuctionRoom = () => {
             // humans instead of robotic offline synthesis.
             filtered.sort((a, b) => Number(a.localService) - Number(b.localService));
 
-            // Deduplicate by display label, preferring "Online" or "Natural" high-quality voice versions
-            const uniqueMap = new Map();
-            filtered.forEach(v => {
-               const label = getVoiceLabel(v.name);
-               const cleanName = v.name.toLowerCase();
-               if (!uniqueMap.has(label) || cleanName.includes("online") || cleanName.includes("natural")) {
-                  uniqueMap.set(label, v);
-               }
-            });
-            filtered = Array.from(uniqueMap.values());
+             // Deduplicate by display label, preferring "Online" or "Natural" high-quality voice versions
+             const uniqueMap = new Map();
+             filtered.forEach(v => {
+                const label = getVoiceLabel(v);
+                const cleanName = v.name.toLowerCase();
+                if (!uniqueMap.has(label) || cleanName.includes("online") || cleanName.includes("natural")) {
+                   uniqueMap.set(label, v);
+                }
+             });
+             filtered = Array.from(uniqueMap.values());
 
-            if (filtered.length === 0) {
-               filtered = voices.filter(v => v.lang.startsWith('en')).slice(0, 5);
-            } else {
-               filtered = filtered.slice(0, 5);
-            }
+             if (filtered.length === 0) {
+                filtered = voices.filter(v => v.lang.startsWith('en')).slice(0, 8);
+             } else {
+                filtered = filtered.slice(0, 12);
+             }
 
             setAvailableVoices(filtered);
             warmUpVoiceEngine(); // prime the engine early for a smooth first announcement
 
-            // Set default selected voice — prefer premium natural voices first
-            if (!selectedVoiceName && filtered.length > 0) {
-               const defaultVoice = filtered.find(v =>
-                  v.name.includes("Aria") ||
-                  v.name.includes("Jenny") ||
-                  v.name.includes("Neerja") ||
-                  v.name.includes("Natural") ||
-                  v.name.includes("Online") ||
-                  v.name.includes("Rishi") ||
-                  v.name.includes("Daniel") ||
-                  v.name.includes("Google US")
-               ) || filtered[0];
+             // Set default selected voice — prefer premium natural voices first
+             if (!selectedVoiceName && filtered.length > 0) {
+                const defaultVoice = filtered.find(v =>
+                   v.name.includes("Aria") ||
+                   v.name.includes("Jenny") ||
+                   v.name.includes("Neerja") ||
+                   v.name.includes("Swara") ||
+                   v.name.includes("Prabhat") ||
+                   v.name.includes("Emma") ||
+                   v.name.includes("Christopher") ||
+                   v.name.includes("Ava") ||
+                   v.name.includes("Andrew") ||
+                   v.name.includes("Natural") ||
+                   v.name.includes("Online") ||
+                   v.name.includes("Rishi") ||
+                   v.name.includes("Lekha") ||
+                   v.name.includes("Veena") ||
+                   v.name.includes("Daniel") ||
+                   v.name.includes("Google US")
+                ) || filtered[0];
 
                if (defaultVoice) {
                   setSelectedVoiceName(defaultVoice.name);
@@ -1548,7 +1622,7 @@ const AuctionRoom = () => {
                         {/* Voice Selector */}
                         {availableVoices.length > 0 && (
                            <div>
-                              <label className="block text-[8px] font-bold text-gray-500 uppercase tracking-widest mb-2">Select Voice</label>
+                              <label className="block text-[8px] font-bold text-gray-500 uppercase tracking-widest mb-2">Select Voice ({availableVoices.length})</label>
                               <select
                                  value={selectedVoiceName}
                                  onChange={(e) => {
@@ -1562,11 +1636,11 @@ const AuctionRoom = () => {
                                  }}
                                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-[10px] text-gray-300 font-semibold focus:outline-none focus:border-yellow-500/50 transition-colors"
                               >
-                                 {availableVoices.map(v => (
-                                    <option key={v.name} value={v.name} className="bg-[#181818] text-white">
-                                       {getVoiceLabel(v.name)}
-                                    </option>
-                                 ))}
+                                  {availableVoices.map(v => (
+                                     <option key={v.name} value={v.name} className="bg-[#181818] text-white">
+                                        {getVoiceLabel(v)}
+                                     </option>
+                                  ))}
                               </select>
                            </div>
                         )}
