@@ -17,11 +17,15 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
    // Filter only text and gif chat messages
    const chatMessages = messages.filter(m => m.type === 'text' || m.type === 'gif' || !m.type);
 
-   const scrollToBottom = () => {
-      if (scrollContainerRef.current) {
-         scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
-      }
-   };
+    const scrollToBottom = () => {
+       const el = scrollContainerRef.current;
+       if (!el) return;
+       // Defer the write to the next frame so it doesn't force a sync
+       // reflow in the middle of React's commit phase.
+       requestAnimationFrame(() => {
+          el.scrollTop = el.scrollHeight;
+       });
+    };
 
 
    useEffect(() => {

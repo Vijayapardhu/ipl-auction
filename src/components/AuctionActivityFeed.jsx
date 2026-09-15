@@ -141,18 +141,10 @@ export default function AuctionActivityFeed() {
           {notifications.map((notif) => (
             <motion.div
               key={notif.id}
-              layout
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{
-                type: 'spring',
-                stiffness: 400,
-                damping: 30,
-                opacity: { duration: 0.12 },
-                height: { type: 'spring', stiffness: 400, damping: 30 },
-                layout: { type: 'spring', stiffness: 400, damping: 30 }
-              }}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
               className="w-full flex-shrink-0 overflow-hidden"
             >
               <div className="border-b border-white/[0.03] pb-1.5">

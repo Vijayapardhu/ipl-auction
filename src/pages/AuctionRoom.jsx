@@ -130,18 +130,18 @@ const AuctionRoom = () => {
       }
    }, [currentAuction?.status, id, navigate]);
 
-   const TEAM_SONGS = {
-      'csk': '/CSK.mpeg',
-      'mi': '/MI.mpeg',
-      'rcb': '/RCB.mpeg',
-      'kkr': '/KKR.mpeg',
-      'dc': '/DC.mpeg',
-      'pbks': '/PBKS.mpeg',
-      'rr': '/RR.mpeg',
-      'srh': '/SRH.mpeg',
-      'lsg': '/LSG.mp3',
-      'gt': '/GT.mp3',
-   };
+    const TEAM_SONGS = {
+       'csk': '/CSK.mp3',
+       'mi': '/MI.mp3',
+       'rcb': '/RCB.mp3',
+       'kkr': '/KKR.mp3',
+       'dc': '/DC.mp3',
+       'pbks': '/PBKS.mp3',
+       'rr': '/RR.mp3',
+       'srh': '/SRH.mp3',
+       'lsg': '/LSG.mp3',
+       'gt': '/GT.mp3',
+    };
 
    useEffect(() => {
       if (user) setSelectedTeamId(user.uid);
@@ -162,13 +162,16 @@ const AuctionRoom = () => {
    const ttsSettingsRef = useRef({ rate: 1.0, pitch: 1.0, voiceName: '', enabled: true });
    ttsSettingsRef.current = { rate: ttsSpeed, pitch: ttsPitch, voiceName: selectedVoiceName, enabled: isTtsEnabled };
 
-   // Smooth-speech engine refs: single-slot queue keeps announcements live
-   // without ever stacking up or clipping mid-word.
-   const speakQueueRef = useRef(null);
-   const isSpeakingRef = useRef(false);
-   const speakTimerRef = useRef(null);
-   const resumeTimerRef = useRef(null);
-   const warmedUpRef = useRef(false);
+    // Smooth-speech engine refs: single-slot queue keeps announcements live
+    // without ever stacking up or clipping mid-word.
+    const speakQueueRef = useRef(null);
+    const isSpeakingRef = useRef(false);
+    const speakTimerRef = useRef(null);
+    const resumeTimerRef = useRef(null);
+    const warmedUpRef = useRef(false);
+    // Single shared AudioContext for beeps — creating one per beep leaks
+    // contexts (browsers cap them) and spams device-renderer errors.
+    const beepCtxRef = useRef(null);
 
    const lastSpokenPlayerIdRef = useRef(null);
    const lastSpokenBidRef = useRef(0);
@@ -502,21 +505,28 @@ const AuctionRoom = () => {
       }
    }, [displayAuctionState?.playerId, displayAuctionState?.currentBid, displayAuctionState?.status, currentAuction?.status, isTtsEnabled, currentPlayer]);
 
-   // Watchdog for the Chrome long-utterance pause bug + cleanup on unmount.
-   // (Chrome silently pauses speech synthesis; resume() keeps it flowing.)
-   useEffect(() => {
-      resumeTimerRef.current = setInterval(() => {
-         try {
-            if (isSpeakingRef.current && 'speechSynthesis' in window && window.speechSynthesis.paused) {
-               window.speechSynthesis.resume();
-            }
-         } catch (e) { /* ignore */ }
-      }, 5000);
-      return () => {
-         if (resumeTimerRef.current) clearInterval(resumeTimerRef.current);
-         stopSpeech();
-      };
-   }, []);
+    // Watchdog for the Chrome long-utterance pause bug + cleanup on unmount.
+    // (Chrome silently pauses speech synthesis; resume() keeps it flowing.)
+    useEffect(() => {
+       resumeTimerRef.current = setInterval(() => {
+          try {
+             if (isSpeakingRef.current && 'speechSynthesis' in window && window.speechSynthesis.paused) {
+                window.speechSynthesis.resume();
+             }
+          } catch (e) { /* ignore */ }
+       }, 5000);
+       return () => {
+          if (resumeTimerRef.current) clearInterval(resumeTimerRef.current);
+          stopSpeech();
+          // Release the shared beep context so no dangling device handle remains.
+          try {
+             if (beepCtxRef.current && beepCtxRef.current.state !== 'closed') {
+                beepCtxRef.current.close().catch(() => {});
+             }
+          } catch (e) { /* ignore */ }
+          beepCtxRef.current = null;
+       };
+    }, []);
 
    const isAdmin = currentAuction?.hostId === user?.uid;
    const currentBid = displayAuctionState?.currentBid || 0;
@@ -609,26 +619,46 @@ const AuctionRoom = () => {
       }
    }, [currentAuction, user]);
 
-   const playBeep = (freq = 440, duration = 0.1) => {
-      try {
-         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-         const oscillator = audioCtx.createOscillator();
-         const gainNode = audioCtx.createGain();
+    const getBeepCtx = () => {
+       try {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          if (!AC) return null;
+          if (!beepCtxRef.current || beepCtxRef.current.state === 'closed') {
+             beepCtxRef.current = new AC();
+          }
+          const ctx = beepCtxRef.current;
+          // A suspended context (autoplay policy / device hiccup) must be
+          // resumed before scheduling, otherwise beeps silently fail.
+          if (ctx.state === 'suspended') {
+             ctx.resume().catch(() => {});
+          }
+          return ctx;
+       } catch (e) {
+          return null;
+       }
+    };
 
-         oscillator.type = 'sine';
-         oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime);
-         gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-         gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+    const playBeep = (freq = 440, duration = 0.1) => {
+       try {
+          const audioCtx = getBeepCtx();
+          if (!audioCtx || audioCtx.state === 'closed') return;
+          const oscillator = audioCtx.createOscillator();
+          const gainNode = audioCtx.createGain();
 
-         oscillator.connect(gainNode);
-         gainNode.connect(audioCtx.destination);
+          oscillator.type = 'sine';
+          oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime);
+          gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
 
-         oscillator.start();
-         oscillator.stop(audioCtx.currentTime + duration);
-      } catch (e) {
-         // Audio context blocked or not supported
-      }
-   };
+          oscillator.connect(gainNode);
+          gainNode.connect(audioCtx.destination);
+
+          oscillator.start();
+          oscillator.stop(audioCtx.currentTime + duration);
+       } catch (e) {
+          // Audio context blocked or not supported
+       }
+    };
 
 
    const lastHandledSoundStatusRef = useRef(null);
@@ -684,22 +714,27 @@ const AuctionRoom = () => {
             };
             frame();
 
-            if (teamId && TEAM_SONGS[teamId.toLowerCase()]) {
-               const audio = celebrationAudioRef.current || new Audio();
-               try {
-                  audio.pause();
-                  audio.src = TEAM_SONGS[teamId.toLowerCase()];
-                  audio.volume = 0.5;
-                  audio.play().catch(() => { });
-               } catch (e) { }
-            }
+             if (teamId && TEAM_SONGS[teamId.toLowerCase()]) {
+                const audio = celebrationAudioRef.current || new Audio();
+                try {
+                   audio.pause();
+                   audio.src = TEAM_SONGS[teamId.toLowerCase()];
+                   audio.volume = 0.5;
+                   audio.currentTime = 0;
+                   audio.load();
+                   const playPromise = audio.play();
+                   if (playPromise !== undefined) {
+                      playPromise.catch(() => { });
+                   }
+                } catch (e) { }
+             }
          }
       } else if (status === 'unsold') {
          const currentKey = `unsold_${displayAuctionState?.playerId}`;
          if (lastHandledSoundStatusRef.current !== currentKey) {
             lastHandledSoundStatusRef.current = currentKey;
 
-            const unsoldAudios = ['/unsold1.mpeg'];
+            const unsoldAudios = ['/unsold1.mp3'];
             const randomAudio = unsoldAudios[Math.floor(Math.random() * unsoldAudios.length)];
             const audio = celebrationAudioRef.current;
             
@@ -761,7 +796,7 @@ const AuctionRoom = () => {
             playBeep(diff === 1 ? 880 : 440, 0.1);
          }
 
-         setTimeLeft(diff);
+          setTimeLeft(prev => (prev === diff ? prev : diff));
          if (diff === 0) {
             clearInterval(interval);
             if (isAdmin && displayAuctionState.status === 'bidding' && !endTriggeredRef.current) {
