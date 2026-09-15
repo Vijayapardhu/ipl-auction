@@ -3,6 +3,7 @@ import { TEAM_SLOGANS } from '../data/slogans';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuction } from '../contexts/AuctionContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useVoice } from '../contexts/VoiceContext';
 import { IPL_PLAYERS } from '../data/players';
 import {
    Wallet,
@@ -15,6 +16,7 @@ import {
    Share2,
     Copy,
     Mic,
+    MicOff,
     MessageSquare,
     Settings as SettingsIcon,
    Home,
@@ -74,7 +76,9 @@ const AuctionRoom = () => {
       getSyncedTime,
       isOnline
    } = useAuction();
-   const { user, logout } = useAuth();
+    const { user, logout } = useAuth();
+    const { joined: voiceJoinedHere, muted: voiceMuted, toggleMute: toggleVoiceMute, activeRoomId } = useVoice();
+    const voiceLive = voiceJoinedHere && activeRoomId === id;
    const [timeLeft, setTimeLeft] = useState(15);
    const [error, setError] = useState('');
    const [copied, setCopied] = useState(false);
@@ -92,6 +96,17 @@ const AuctionRoom = () => {
     const [miniChatOpen, setMiniChatOpen] = useState(false);
     const [showShare, setShowShare] = useState(false);
     const [showMore, setShowMore] = useState(false);
+    const [isDesktop, setIsDesktop] = useState(
+      typeof window !== 'undefined' ? window.innerWidth >= 768 : false
+    );
+
+    // Track viewport so the mini-chat bubble hides whenever the full chat
+    // page is actually visible (desktop sidebar, or mobile logs tab).
+    useEffect(() => {
+      const onResize = () => setIsDesktop(window.innerWidth >= 768);
+      window.addEventListener('resize', onResize);
+      return () => window.removeEventListener('resize', onResize);
+    }, []);
     const prevChatCountRef = useRef(0);
 
     // Unread chat badge: counts chat messages arriving while Chat is closed.
@@ -1227,6 +1242,37 @@ const AuctionRoom = () => {
 
              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 <button
+                   onClick={() => {
+                      const newTtsVal = !isTtsEnabled;
+                      setIsTtsEnabled(newTtsVal);
+                      if (!newTtsVal) {
+                         stopSpeech();
+                      } else {
+                         warmUpVoiceEngine();
+                         setTimeout(() => speak("Voice auctioneer, enabled.", true), 250);
+                      }
+                   }}
+                   aria-label={isTtsEnabled ? 'Mute auctioneer voice' : 'Enable auctioneer voice'}
+                   title={isTtsEnabled ? 'Mute auctioneer voice' : 'Enable auctioneer voice'}
+                   className={`flex items-center justify-center gap-1.5 p-2.5 min-w-[44px] min-h-[44px] rounded-xl border transition-all cursor-pointer active:scale-95 ${isTtsEnabled
+                      ? 'bg-white/10 border-white/20 text-white'
+                      : 'bg-white/5 border-white/10 text-gray-500 hover:bg-white/10 hover:text-gray-300'}`}
+                >
+                   <Gavel size={14} /> <span className="hidden lg:inline text-[10px] font-black uppercase tracking-widest">{isTtsEnabled ? 'Voice On' : 'Voice Off'}</span>
+                </button>
+                {voiceLive && (
+                   <button
+                      onClick={toggleVoiceMute}
+                      aria-label={voiceMuted ? 'Unmute voice chat' : 'Mute voice chat'}
+                      title={voiceMuted ? 'Unmute voice chat' : 'Mute voice chat'}
+                      className={`flex items-center justify-center gap-1.5 p-2.5 min-w-[44px] min-h-[44px] rounded-xl border transition-all cursor-pointer active:scale-95 ${voiceMuted
+                         ? 'bg-red-500/15 border-red-500/30 text-red-400'
+                         : 'bg-green-500/15 border-green-500/30 text-green-400 hover:bg-green-500/25'}`}
+                   >
+                      {voiceMuted ? <MicOff size={14} /> : <Mic size={14} />} <span className="hidden lg:inline text-[10px] font-black uppercase tracking-widest">{voiceMuted ? 'Muted' : 'Live'}</span>
+                   </button>
+                )}
+                <button
                    onClick={() => setShowShare(true)}
                    aria-label="Invite friends"
                    className="flex items-center justify-center gap-1.5 bg-[#ff5500]/10 border border-[#ff5500]/25 p-2.5 min-w-[44px] min-h-[44px] rounded-xl text-[#ff5500] text-[10px] font-black uppercase tracking-widest hover:bg-[#ff5500]/20 hover:text-white transition-all cursor-pointer active:scale-95"
@@ -1841,7 +1887,7 @@ const AuctionRoom = () => {
              </div>
           </div>
 
-          <MiniChat roomId={id} open={miniChatOpen} setOpen={setMiniChatOpen} unread={unreadChat} />
+          <MiniChat roomId={id} open={miniChatOpen} setOpen={setMiniChatOpen} unread={unreadChat} hidden={sidebarTab === 'chat' && (isDesktop || mobileTab === 'activity')} />
 
           {showShare && (
             <ShareSheet

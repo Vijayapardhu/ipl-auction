@@ -7,10 +7,10 @@ import TextChat from './TextChat';
  * Floating mini chat for the bidding view: read + reply without leaving
  * the arena. Opens as a bottom sheet (mobile) / docked card (desktop).
  */
-const MiniChat = ({ roomId, open, setOpen, unread }) => {
+const MiniChat = ({ roomId, open, setOpen, unread, hidden }) => {
   return (
     <>
-      {!open && (
+      {!open && !hidden && (
         <button
           onClick={() => setOpen(true)}
           aria-label="Open chat"

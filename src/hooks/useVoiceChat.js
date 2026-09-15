@@ -279,9 +279,13 @@ export const useVoiceChat = ({ roomId, user, displayName, teamId, teamName }) =>
 
   const join = useCallback(async (override) => {
     // Allow callers (e.g. a persistent provider) to join with fresh args
-    // without remounting the hook.
+    // without remounting the hook. Derive myUid from the user object when
+    // it isn't passed explicitly — without it we silently bail below.
     if (override) {
       metaRef.current = { ...metaRef.current, ...override };
+      if (!metaRef.current.myUid && override.user?.uid) {
+        metaRef.current.myUid = override.user.uid;
+      }
     }
     lastArgsRef.current = { ...metaRef.current };
     const { roomId: rid, myUid: uid } = metaRef.current;
