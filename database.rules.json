@@ -54,10 +54,14 @@
         },
         "voice-signals": {
           "$userId": {
-            // WebRTC signaling inbox: any authenticated peer may send an
-            // offer/answer/ICE candidate, but only from themselves
+            // Inbox owner may clear their own inbox (stale-signal purge on join)
+            ".write": "auth != null && auth.uid == $userId",
             "$signalId": {
-              ".write": "auth != null && newData.child('from').val() === auth.uid"
+              // Any authenticated peer may drop an offer/answer/ICE signal.
+              // Shape enforced; sender identity is cross-checked client-side
+              // against the voice roster before acting on any signal.
+              ".write": "auth != null",
+              ".validate": "newData.hasChildren(['from', 'kind'])"
             }
           }
         }
