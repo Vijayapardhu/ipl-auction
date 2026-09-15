@@ -102,20 +102,23 @@ const AuctionRoom = () => {
     // contexts (browsers cap them) and spams device-renderer errors.
     const beepCtxRef = useRef(null);
 
-    // Create/resume the beep context. Resume is only attempted after a
-    // real user gesture (or sticky activation) — otherwise Chrome logs
-    // "The AudioContext was not allowed to start".
+    // Create/resume the beep context. WebAudio is NEVER touched before
+    // sticky activation exists — not even construction, since Chrome logs
+    // "The AudioContext was not allowed to start" for pre-gesture creation
+    // and each construction probes the audio device (renderer errors).
+    const hasStickyActivation = () =>
+       typeof navigator !== 'undefined' && navigator.userActivation && navigator.userActivation.hasBeenActive;
+
     const unlockBeepCtx = (fromGesture = false) => {
        try {
+          if (!fromGesture && !hasStickyActivation()) return;
           const AC = window.AudioContext || window.webkitAudioContext;
           if (!AC) return;
           if (!beepCtxRef.current || beepCtxRef.current.state === 'closed') {
              beepCtxRef.current = new AC();
           }
           const ctx = beepCtxRef.current;
-          const activated = fromGesture ||
-             (typeof navigator !== 'undefined' && navigator.userActivation && navigator.userActivation.hasBeenActive);
-          if (ctx.state === 'suspended' && activated) {
+          if (ctx.state === 'suspended' || ctx.state === 'interrupted') {
              ctx.resume().catch(() => {});
           }
        } catch (e) { /* ignore */ }
