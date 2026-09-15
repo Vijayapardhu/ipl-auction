@@ -10,11 +10,8 @@ const Footer = () => {
 
       {/* ── Wordmark ── */}
       <div aria-hidden className="select-none pointer-events-none px-2 pt-14">
-        <p className="text-center font-black uppercase leading-[0.85] tracking-tighter text-[15.5vw] lg:text-[11rem] bg-gradient-to-b from-white/[0.13] to-white/[0.02] bg-clip-text text-transparent whitespace-nowrap">
+        <p className="text-center font-black uppercase leading-[0.85] tracking-tighter text-[15.5vw] lg:text-[11rem] bg-gradient-to-b from-white/[0.14] via-white/[0.07] to-transparent bg-clip-text text-transparent whitespace-nowrap [mask-image:linear-gradient(to_bottom,black_60%,transparent_99%)]">
           Auction Hub
-        </p>
-        <p className="text-center font-black uppercase leading-none tracking-[0.45em] text-[3.4vw] lg:text-2xl text-transparent pb-6 -mt-1 sm:-mt-2" style={{ WebkitTextStroke: '1px rgba(255,85,0,0.35)' }}>
-          IPL Simulator
         </p>
       </div>
 
