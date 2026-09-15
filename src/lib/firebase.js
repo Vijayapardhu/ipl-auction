@@ -1,7 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
-import { getAnalytics } from "firebase/analytics";
 import { getDatabase, ref, onValue } from "firebase/database";
 
 const firebaseConfig = {
@@ -18,12 +17,61 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager()
-  })
-});
-export const analytics = getAnalytics(app);
+
+// Firestore loads on demand (auction history, completion flush, fallbacks)
+// so its ~500KB never blocks first paint on low-end connections.
+let _db = null;
+let _dbPromise = null;
+export const getDb = () => {
+  if (_db) return Promise.resolve(_db);
+  if (!_dbPromise) {
+    _dbPromise = import('firebase/firestore')
+      .then((fs) => {
+        _db = fs.initializeFirestore(app, {
+          localCache: fs.persistentLocalCache({
+            tabManager: fs.persistentMultipleTabManager(),
+          }),
+        });
+        return _db;
+      })
+      .catch((err) => {
+        _dbPromise = null;
+        throw err;
+      });
+  }
+  return _dbPromise;
+};
+
+// Firestore API surface, loaded alongside the SDK on first use.
+let _fs = null;
+export const getFs = async () => {
+  if (!_fs) _fs = await import('firebase/firestore');
+  return _fs;
+};
+export const analytics = null;
+
+// Analytics loads idle + off the critical path: it only reports, and its
+// network beacons must never slow first paint on low-end connections.
+if (typeof window !== 'undefined') {
+  const initAnalytics = () => {
+    import('firebase/analytics')
+      .then(({ getAnalytics, isSupported }) =>
+        isSupported()
+          .then((ok) => {
+            if (ok) {
+              try { getAnalytics(app); } catch (e) { /* ignore */ }
+            }
+          })
+          .catch(() => {})
+      )
+      .catch(() => {});
+  };
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(initAnalytics, { timeout: 12000 });
+  } else {
+    setTimeout(initAnalytics, 4000);
+  }
+}
 
 
 // ─── Server Time Sync via Firebase RTDB ───

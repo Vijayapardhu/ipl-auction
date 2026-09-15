@@ -1,10 +1,11 @@
-import { db } from './firebase';
-import { collection, doc, setDoc } from 'firebase/firestore';
+import { getDb, getFs } from './firebase';
 import { IPL_PLAYERS } from '../data/players';
 
 // This script can be run from the console or a temporary component to seed Firestore
 export const seedPlayers = async () => {
   try {
+    const { collection, doc, setDoc } = await getFs();
+    const db = await getDb();
     const playersRef = collection(db, 'players');
     for (const player of IPL_PLAYERS) {
       await setDoc(doc(playersRef, player.id), player);
@@ -17,6 +18,8 @@ export const seedPlayers = async () => {
 
 export const createInitialAuction = async (auctionId) => {
   try {
+    const { doc, setDoc } = await getFs();
+    const db = await getDb();
     await setDoc(doc(db, 'auctions', auctionId), {
       name: "Mega Auction",
       status: "active",

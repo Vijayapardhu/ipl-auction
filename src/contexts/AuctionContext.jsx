@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { db, getServerTime, rtdb } from '../lib/firebase';
+import { getDb, getFs, getServerTime, rtdb } from '../lib/firebase';
 import { IPL_PLAYERS } from '../data/players';
-import { 
-  ref, 
-  set, 
-  get, 
-  update as updateRtdb, 
-  onValue, 
+import {
+  ref,
+  set,
+  get,
+  update as updateRtdb,
+  onValue,
   onDisconnect,
   runTransaction as runTransactionRtdb,
   push,
@@ -14,26 +14,8 @@ import {
   query as queryRtdb,
   limitToLast
 } from 'firebase/database';
-import { 
-  doc, 
-  onSnapshot, 
-  updateDoc, 
-  getDoc,
-  getDocs,
-  setDoc,
-  addDoc,
-  arrayUnion,
-  arrayRemove,
-  collection,
-  runTransaction,
-  deleteDoc,
-  query,
-  where,
-  orderBy,
-  serverTimestamp,
-  increment,
-  writeBatch
-} from 'firebase/firestore';
+// NOTE: firebase/firestore is never statically imported here — it loads on
+// demand via getDb()/getFs() so first paint stays light (see lib/firebase.js).
 import { useAuth } from './AuthContext';
 import { useQuota } from './QuotaContext';
 
@@ -72,7 +54,27 @@ export const AuctionProvider = ({ children }) => {
   const [roomTeams, setRoomTeams] = useState([]);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isOnline, setIsOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
   const endingPlayerRef = React.useRef(false);
+
+  // Connection awareness: RTDB's own socket state (flaps on low networks)
+  // plus the browser offline signal. UI locks bidding while disconnected
+  // instead of hanging transactions.
+  React.useEffect(() => {
+    const connRef = ref(rtdb, '.info/connected');
+    const offRtdb = onValue(connRef, (snap) => {
+      setIsOnline(snap.val() === true);
+    });
+    const goOffline = () => setIsOnline(false);
+    const goOnline = () => { /* RTDB listener above re-confirms the socket */ };
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('online', goOnline);
+    return () => {
+      offRtdb();
+      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('online', goOnline);
+    };
+  }, []);
 
 
   // Server-authoritative time using Firebase RTDB offset.
@@ -139,6 +141,10 @@ export const AuctionProvider = ({ children }) => {
       const teamsSnap = await get(ref(rtdb, `auctions/${roomId}/teams`));
 
       if (!roomSnap.exists()) return;
+
+      // Firestore loads here (auction end) — long after first paint.
+      const { doc, writeBatch, serverTimestamp } = await getFs();
+      const db = await getDb();
 
       const roomData = roomSnap.val();
       const teamsData = teamsSnap.exists() ? teamsSnap.val() : {};
@@ -212,6 +218,55 @@ export const AuctionProvider = ({ children }) => {
       type: 'log',
       timestamp: serverTimestampRtdb()
     });
+  }, [getSyncedTime, flushAuctionToFirestore]);
+
+  // Advance the room from a sold/unsold player to the next one (or complete).
+  // Fenced: only acts if live still shows the same player+status, so late
+  // retries and multi-admin watchdogs can never double-advance or clobber
+  // a pause/end. Always releases the end-guard.
+  const advanceToNextPlayer = useCallback(async (roomId, ended) => {
+    const liveRef = ref(rtdb, `auctions/${roomId}/live`);
+    try {
+      const liveSnap = await get(liveRef);
+      const live = liveSnap.exists() ? liveSnap.val() : null;
+      if (!live || live.playerId !== ended?.playerId) return;
+      if (live.status !== ended?.status || (live.status !== 'sold' && live.status !== 'unsold')) return;
+
+      const roomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
+      const roomData = roomSnap.exists() ? roomSnap.val() : {};
+      if (roomData.status !== 'active') return;
+
+      let playerOrder = roomData.playerOrder;
+      if (!playerOrder) {
+        const orderSnap = await get(ref(rtdb, `auctions/${roomId}/playerOrder`));
+        if (orderSnap.exists()) playerOrder = orderSnap.val();
+      }
+
+      const settings = roomData.settings;
+      const order = playerOrder || Array.from({ length: IPL_PLAYERS.length }, (_, i) => i);
+      const currentPlayerIndexInOrder = order.findIndex(idx => IPL_PLAYERS[idx] && IPL_PLAYERS[idx].id === ended.playerId);
+      const nextIndexInOrder = currentPlayerIndexInOrder !== -1 ? order[currentPlayerIndexInOrder + 1] : order[0];
+
+      if (nextIndexInOrder !== undefined) {
+        const nextPlayer = IPL_PLAYERS[nextIndexInOrder];
+        await set(liveRef, {
+          playerId: nextPlayer.id,
+          currentBid: 0,
+          highBidderId: '',
+          highBidderName: 'No Bids',
+          timerEndsAt: getSyncedTime() + (settings?.bidTimer || 10) * 1000,
+          status: 'bidding'
+        });
+      } else {
+        // Flush final completed status & all teams to Firestore once at end of auction!
+        await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { status: 'completed' });
+        await flushAuctionToFirestore(roomId);
+      }
+    } catch (err) {
+      // A watchdog retry will pick it up; never leave the end-guard stuck.
+    } finally {
+      endingPlayerRef.current = false;
+    }
   }, [getSyncedTime, flushAuctionToFirestore]);
 
   const endPlayerAuction = useCallback(async (roomId) => {
@@ -311,46 +366,18 @@ export const AuctionProvider = ({ children }) => {
 
       const waitTime = isSold ? 5000 : 2000;
 
-      // Get player order and settings directly from RTDB snapshot
-      const rtdbRoomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
-      const roomData = rtdbRoomSnap.exists() ? rtdbRoomSnap.val() : {};
-
-      let playerOrder = roomData.playerOrder;
-      if (!playerOrder) {
-        const orderSnap = await get(ref(rtdb, `auctions/${roomId}/playerOrder`));
-        if (orderSnap.exists()) playerOrder = orderSnap.val();
-      }
-
-      setTimeout(async () => {
-        if (roomData.status !== 'active') return;
-
-        const settings = roomData.settings;
-        const currentPlayerId = auctionState.playerId;
-        const order = playerOrder || Array.from({ length: IPL_PLAYERS.length }, (_, i) => i);
-        const currentPlayerIndexInOrder = order.findIndex(idx => IPL_PLAYERS[idx] && IPL_PLAYERS[idx].id === currentPlayerId);
-        const nextIndexInOrder = currentPlayerIndexInOrder !== -1 ? order[currentPlayerIndexInOrder + 1] : order[0];
-        
-        if (nextIndexInOrder !== undefined) {
-          const nextPlayer = IPL_PLAYERS[nextIndexInOrder];
-          await set(liveRef, {
-            playerId: nextPlayer.id,
-            currentBid: 0,
-            highBidderId: '',
-            highBidderName: 'No Bids',
-            timerEndsAt: getSyncedTime() + (settings?.bidTimer || 10) * 1000,
-            status: 'bidding'
-          });
-        } else {
-          // Flush final completed status & all teams to Firestore once at end of auction!
-          await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { status: 'completed' });
-          await flushAuctionToFirestore(roomId);
-        }
-        endingPlayerRef.current = false;
+      // Capture identity now; the delayed advance re-reads fresh state and is
+      // fenced to this player+status, so post-commit read failures or a
+      // closed/throttled tab can never strand the room.
+      const endedPlayerId = auctionState.playerId;
+      const endedStatus = auctionState.status;
+      setTimeout(() => {
+        advanceToNextPlayer(roomId, { playerId: endedPlayerId, status: endedStatus });
       }, waitTime);
     } catch (err) {
       endingPlayerRef.current = false;
     }
-  }, [getSyncedTime, flushAuctionToFirestore]);
+  }, [getSyncedTime, flushAuctionToFirestore, advanceToNextPlayer]);
 
   const joinRoomDb = useCallback(async (roomId, userId, playerDetails) => {
     const teamDetails = TEAMS.find(t => t.id === playerDetails.team);
@@ -363,6 +390,8 @@ export const AuctionProvider = ({ children }) => {
       data = rtdbRoomSnap.val();
     } else {
       // Fallback: Fetch from Firestore only if RTDB room node does not exist yet
+      const { doc, getDoc } = await getFs();
+      const db = await getDb();
       const roomSnap = await getDoc(doc(db, 'auctions', roomId));
       if (!roomSnap.exists()) throw new Error("Room not found!");
       data = roomSnap.data();
@@ -554,6 +583,8 @@ export const AuctionProvider = ({ children }) => {
         setTimeout(async () => {
           if (auctionLoaded) return;
           try {
+            const { doc, getDoc } = await getFs();
+            const db = await getDb();
             const fsDoc = await getDoc(doc(db, 'auctions', auctionId));
             if (fsDoc.exists()) {
               const data = fsDoc.data();
@@ -602,6 +633,8 @@ export const AuctionProvider = ({ children }) => {
         setTimeout(async () => {
           if (teamsLoaded) return;
           try {
+            const { collection, query, where, getDocs } = await getFs();
+            const db = await getDb();
             const tq = query(collection(db, 'teams'), where('auctionId', '==', auctionId));
             const tSnap = await getDocs(tq);
             if (!tSnap.empty) {
@@ -677,15 +710,24 @@ export const AuctionProvider = ({ children }) => {
     await push(msgRef, {
       userId: user.uid,
       userName: user.displayName || 'Manager',
+      teamId: team?.teamId || team?.team || '',
       text,
       type,
       timestamp: serverTimestampRtdb()
     });
+  }, [user, team]);
+
+  // Toggle an emoji reaction on a chat message (transactional, race-safe).
+  const toggleReaction = useCallback(async (roomId, msgId, emoji) => {
+    if (!user || !roomId || !msgId || !emoji) return;
+    const rRef = ref(rtdb, `auctions/${roomId}/messages/${msgId}/reactions/${emoji}/${user.uid}`);
+    await runTransactionRtdb(rRef, (cur) => (cur ? null : true));
   }, [user]);
 
   const placeBid = useCallback(async (amount) => {
     if (!currentAuction) throw new Error("Auction not found!");
     if (!user) throw new Error("Please log in to bid!");
+    if (!isOnline) throw new Error("Reconnecting… check your network and bid again.");
     if (!team) throw new Error("You must select a team in the lobby to participate!");
     if (currentAuction.bannedPlayers && currentAuction.bannedPlayers.includes(user.uid)) {
       throw new Error("You have been removed from this auction and cannot bid.");
@@ -715,11 +757,10 @@ export const AuctionProvider = ({ children }) => {
       }
     }
 
-    const auctionDoc = doc(db, 'auctions', currentAuction.id);
     let finalAmount = amount;
 
     const liveRef = ref(rtdb, `auctions/${currentAuction.id}/live`);
-    await runTransactionRtdb(liveRef, (currentData) => {
+    const txResult = await runTransactionRtdb(liveRef, (currentData) => {
       if (!currentData) return currentData;
       if (currentData.status !== 'bidding') return; // abort
       if (currentData.highBidderId === user.uid) return; // abort
@@ -740,6 +781,13 @@ export const AuctionProvider = ({ children }) => {
       return currentData;
     });
 
+    // On slow networks the room often moves before our bid lands (outbid,
+    // timer ended, overspent). The transaction aborts — do NOT log a phantom
+    // "New bid", just tell the user to bid fresh.
+    if (!txResult || !txResult.committed) {
+      throw new Error('Outbid! The price moved — place a fresh bid.');
+    }
+
     // Add to messages collection for chronological sorting
     const msgRef = ref(rtdb, `auctions/${currentAuction.id}/messages`);
     await push(msgRef, {
@@ -749,7 +797,7 @@ export const AuctionProvider = ({ children }) => {
       type: 'log',
       timestamp: serverTimestampRtdb()
     });
-  }, [currentAuction, user, team]);
+  }, [currentAuction, user, team, isOnline]);
 
   const updatePlayerTeam = useCallback(async (roomId, userId, newTeamId) => {
     const rtdbRoomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
@@ -791,6 +839,10 @@ export const AuctionProvider = ({ children }) => {
   const pauseAuction = useCallback(async (roomId) => {
     if (!user || !currentAuction || currentAuction.hostId !== user.uid) return;
 
+    // Fenced: only pause a live bidding room (laggy double-taps safe).
+    const liveSnap = await get(ref(rtdb, `auctions/${roomId}/live`));
+    if (!liveSnap.exists() || liveSnap.val().status !== 'bidding') return;
+
     const liveRef = ref(rtdb, `auctions/${roomId}/live`);
     const msgRef = ref(rtdb, `auctions/${roomId}/messages`);
     
@@ -809,7 +861,12 @@ export const AuctionProvider = ({ children }) => {
 
   const resumeAuction = useCallback(async (roomId) => {
     if (!user || !currentAuction || currentAuction.hostId !== user.uid) return;
-    
+
+    // Fenced: only resume a paused room, so a stale tap can never
+    // override bidding/sold/unsold with a fresh timer.
+    const liveSnap = await get(ref(rtdb, `auctions/${roomId}/live`));
+    if (!liveSnap.exists() || liveSnap.val().status !== 'paused') return;
+
     const liveRef = ref(rtdb, `auctions/${roomId}/live`);
     const msgRef = ref(rtdb, `auctions/${roomId}/messages`);
     
@@ -857,12 +914,15 @@ export const AuctionProvider = ({ children }) => {
     updateRoomSettings,
     startAuction,
     endPlayerAuction,
+    advanceToNextPlayer,
     pauseAuction,
     resumeAuction,
     endAuction,
     sendMessage,
+    toggleReaction,
     messages,
-    getSyncedTime
+    getSyncedTime,
+    isOnline
   };
 
   return (

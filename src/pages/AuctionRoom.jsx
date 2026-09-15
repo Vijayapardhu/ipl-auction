@@ -1,7 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { toPng } from 'html-to-image';
 import { TEAM_SLOGANS } from '../data/slogans';
-import confetti from 'canvas-confetti';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuction } from '../contexts/AuctionContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,9 +13,9 @@ import {
    ChevronRight,
    TrendingUp,
    Share2,
-   Copy,
-   MessageSquare,
-   Settings as SettingsIcon,
+    Copy,
+    Mic,
+    Settings as SettingsIcon,
    Home,
    Pause,
    XCircle,
@@ -39,14 +37,12 @@ import {
    ShieldAlert,
     Trophy,
     Clock,
-    LogOut,
-    Mic
+    LogOut
  } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { TEAMS } from '../data/teams';
-import TextChat from '../components/TextChat';
-import VoiceChat from '../components/VoiceChat';
+import ConnectPanel from '../components/ConnectPanel';
 import PageLoader from '../components/PageLoader';
 
 const AuctionRoom = () => {
@@ -61,6 +57,7 @@ const AuctionRoom = () => {
       joinAuction,
       joinRoomDb,
       endPlayerAuction,
+      advanceToNextPlayer,
       pauseAuction,
       resumeAuction,
       endAuction,
@@ -68,7 +65,8 @@ const AuctionRoom = () => {
       messages,
       updateRoomSettings,
       kickPlayer,
-      getSyncedTime
+      getSyncedTime,
+      isOnline
    } = useAuction();
    const { user, logout } = useAuth();
    const [timeLeft, setTimeLeft] = useState(15);
@@ -82,8 +80,25 @@ const AuctionRoom = () => {
    const [showSettings, setShowSettings] = useState(false);
    const [summaryTab, setSummaryTab] = useState('squads'); // squads, leaderboard
    const [showParticipantsOverlay, setShowParticipantsOverlay] = useState(false);
-    const [sidebarTab, setSidebarTab] = useState('activity'); // activity, chat or voice
+    const [sidebarTab, setSidebarTab] = useState('activity'); // activity or connect
     const [voiceJoined, setVoiceJoined] = useState(false);
+    const [unreadChat, setUnreadChat] = useState(0);
+    const prevChatCountRef = useRef(0);
+
+    // Unread chat badge: counts chat messages arriving while Connect is closed.
+    const chatCount = useMemo(
+       () => messages.filter(m => m.type === 'text' || m.type === 'gif' || !m.type).length,
+       [messages]
+    );
+    useEffect(() => {
+       if (chatCount > prevChatCountRef.current && sidebarTab !== 'connect') {
+          setUnreadChat((c) => c + (chatCount - prevChatCountRef.current));
+       }
+       prevChatCountRef.current = chatCount;
+    }, [chatCount, sidebarTab]);
+    useEffect(() => {
+       if (sidebarTab === 'connect') setUnreadChat(0);
+    }, [sidebarTab]);
    const audioRef = useRef(null);
    const celebrationAudioRef = useRef(null);
    const [newTimerValue, setNewTimerValue] = useState(currentAuction?.settings?.bidTimer || 10);
@@ -178,6 +193,43 @@ const AuctionRoom = () => {
        'lsg': '/LSG.mp3',
        'gt': '/GT.mp3',
     };
+    const UNSOLD_SONG = '/unsold1.mp3';
+
+    // Preload celebration songs into the browser cache during idle time, so
+    // the sold jingle starts instantly instead of fetching (and glitching)
+    // on every sold. Preloading needs no user gesture — only playback does.
+    // Skipped entirely on metered connections (Save-Data).
+    useEffect(() => {
+       let cancelled = false;
+       const saveData = typeof navigator !== 'undefined' && !!navigator.connection?.saveData;
+       const preload = () => {
+          if (cancelled || saveData) return;
+          [...Object.values(TEAM_SONGS), UNSOLD_SONG].forEach((src) => {
+             try {
+                const a = new Audio();
+                a.preload = 'auto';
+                a.src = src;
+                a.load();
+             } catch (e) { /* ignore */ }
+          });
+          // Warm the on-demand code chunks too (tiny, non-blocking).
+          import('canvas-confetti').catch(() => {});
+          import('html-to-image').catch(() => {});
+       };
+       if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+          const idleId = window.requestIdleCallback(preload, { timeout: 8000 });
+          return () => {
+             cancelled = true;
+             window.cancelIdleCallback(idleId);
+          };
+       }
+       const timer = setTimeout(preload, 2500);
+       return () => {
+          cancelled = true;
+          clearTimeout(timer);
+       };
+       // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
    useEffect(() => {
       if (user) setSelectedTeamId(user.uid);
@@ -551,6 +603,9 @@ const AuctionRoom = () => {
        return () => {
           if (resumeTimerRef.current) clearInterval(resumeTimerRef.current);
           stopSpeech();
+          // Stop any celebration fade so no audio outlives the room.
+          celebTokenRef.current += 1;
+          clearCelebFade();
           // Release the shared beep context so no dangling device handle remains.
           try {
              if (beepCtxRef.current && beepCtxRef.current.state !== 'closed') {
@@ -688,13 +743,82 @@ const AuctionRoom = () => {
     };
 
 
-   const lastHandledSoundStatusRef = useRef(null);
+    const lastHandledSoundStatusRef = useRef(null);
 
-   useEffect(() => {
-      const status = displayAuctionState?.status;
-      let rafId;
+    // Smooth celebration audio: ramped fades + generation tokens so rapid
+    // sold → sold (or sold → unsold) transitions crossfade cleanly instead
+    // of cutting, and a stale fade can never resurrect old audio.
+    const celebFadeTimerRef = useRef(null);
+    const celebTokenRef = useRef(0);
 
-      if (status === 'sold') {
+    const clearCelebFade = () => {
+       if (celebFadeTimerRef.current) {
+          clearInterval(celebFadeTimerRef.current);
+          celebFadeTimerRef.current = null;
+       }
+    };
+
+    const fadeCelebVolume = (audio, from, to, ms) => {
+       return new Promise((resolve) => {
+          clearCelebFade();
+          const steps = Math.max(1, Math.round(ms / 50));
+          let i = 0;
+          try { audio.volume = from; } catch (e) { /* ignore */ }
+          celebFadeTimerRef.current = setInterval(() => {
+             i += 1;
+             const t = Math.min(1, i / steps);
+             try { audio.volume = from + (to - from) * t; } catch (e) { /* ignore */ }
+             if (t >= 1) {
+                clearCelebFade();
+                resolve();
+             }
+          }, 50);
+       });
+    };
+
+    const playCelebration = async (src, { volume = 0.5, fadeInMs = 1500, fadeOutMs = 500 } = {}) => {
+       const token = ++celebTokenRef.current;
+       const audio = celebrationAudioRef.current || (celebrationAudioRef.current = new Audio());
+       try {
+          // Gracefully duck whatever is currently playing before swapping.
+          if (!audio.paused) {
+             await fadeCelebVolume(audio, audio.volume, 0, fadeOutMs);
+             if (token !== celebTokenRef.current) return;
+             audio.pause();
+          }
+          audio.src = src;
+          audio.load();
+          audio.currentTime = 0;
+          audio.volume = 0;
+          await audio.play();
+          if (token !== celebTokenRef.current) {
+             audio.pause();
+             return;
+          }
+          await fadeCelebVolume(audio, 0, volume, fadeInMs);
+       } catch (e) {
+          // Autoplay blocked or format unsupported — stay silent.
+       }
+    };
+
+    const stopCelebration = async (fadeOutMs = 600) => {
+       const token = ++celebTokenRef.current;
+       const audio = celebrationAudioRef.current;
+       if (!audio || audio.paused) return;
+       try {
+          await fadeCelebVolume(audio, audio.volume, 0, fadeOutMs);
+          if (token !== celebTokenRef.current) return;
+          audio.pause();
+          audio.currentTime = 0;
+       } catch (e) { /* ignore */ }
+    };
+
+    useEffect(() => {
+       const status = displayAuctionState?.status;
+       let rafId;
+       let cancelled = false;
+
+       if (status === 'sold') {
          const currentKey = `sold_${displayAuctionState?.highBidderTeamId}_${displayAuctionState?.currentBid}`;
          if (lastHandledSoundStatusRef.current !== currentKey) {
             lastHandledSoundStatusRef.current = currentKey;
@@ -712,48 +836,51 @@ const AuctionRoom = () => {
                'GT': ['#1B2133', '#C1AA77', '#0B132B'],
                'LSG': ['#0057E7', '#D11D55', '#01153E']
             };
-            const colors = teamId && colorMap[teamId] ? colorMap[teamId] : ['#FFD700', '#FFA500', '#FF4500'];
+             const colors = teamId && colorMap[teamId] ? colorMap[teamId] : ['#FFD700', '#FFA500', '#FF4500'];
 
-            const end = Date.now() + 3 * 1000;
-            const frame = () => {
-               confetti({
-                  particleCount: 2,
-                  angle: 60,
-                  spread: 55,
-                  origin: { x: 0, y: 0.6 },
-                  colors: colors,
-                  scalar: 1.2,
-                  ticks: 200
-               });
-               confetti({
-                  particleCount: 2,
-                  angle: 120,
-                  spread: 55,
-                  origin: { x: 1, y: 0.6 },
-                  colors: colors,
-                  scalar: 1.2,
-                  ticks: 200
-               });
+             // Confetti loads on demand (never in the initial bundle).
+             // Skipped for reduced-motion users; thinned out on low-end
+             // devices so the celebration never janks the page.
+             const reducedMotion = typeof window !== 'undefined' &&
+                window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+             const lowEndDevice = typeof navigator !== 'undefined' &&
+                ((navigator.hardwareConcurrency || 8) <= 4 || !!navigator.connection?.saveData);
+             if (!reducedMotion) {
+                const scale = lowEndDevice ? 0.4 : 1;
+                import('canvas-confetti').then(({ default: fire }) => {
+                   if (cancelled) return;
+                   const end = Date.now() + 3 * 1000;
+                   const frame = () => {
+                      if (cancelled) return;
+                      fire({
+                         particleCount: Math.max(1, Math.round(2 * scale)),
+                         angle: 60,
+                         spread: 55,
+                         origin: { x: 0, y: 0.6 },
+                         colors: colors,
+                         scalar: 1.2,
+                         ticks: 200
+                      });
+                      fire({
+                         particleCount: Math.max(1, Math.round(2 * scale)),
+                         angle: 120,
+                         spread: 55,
+                         origin: { x: 1, y: 0.6 },
+                         colors: colors,
+                         scalar: 1.2,
+                         ticks: 200
+                      });
 
-               if (Date.now() < end) {
-                  rafId = requestAnimationFrame(frame);
-               }
-            };
-            frame();
+                      if (Date.now() < end) {
+                         rafId = requestAnimationFrame(frame);
+                      }
+                   };
+                   frame();
+                }).catch(() => {});
+             }
 
              if (teamId && TEAM_SONGS[teamId.toLowerCase()]) {
-                const audio = celebrationAudioRef.current || new Audio();
-                try {
-                   audio.pause();
-                   audio.src = TEAM_SONGS[teamId.toLowerCase()];
-                   audio.volume = 0.5;
-                   audio.currentTime = 0;
-                   audio.load();
-                   const playPromise = audio.play();
-                   if (playPromise !== undefined) {
-                      playPromise.catch(() => { });
-                   }
-                } catch (e) { }
+                playCelebration(TEAM_SONGS[teamId.toLowerCase()], { volume: 0.5, fadeInMs: 1800 });
              }
          }
       } else if (status === 'unsold') {
@@ -761,39 +888,19 @@ const AuctionRoom = () => {
          if (lastHandledSoundStatusRef.current !== currentKey) {
             lastHandledSoundStatusRef.current = currentKey;
 
-            const unsoldAudios = ['/unsold1.mp3'];
-            const randomAudio = unsoldAudios[Math.floor(Math.random() * unsoldAudios.length)];
-            const audio = celebrationAudioRef.current;
-            
-            if (audio) {
-               try {
-                  audio.pause();
-                  audio.src = randomAudio;
-                  audio.volume = 0.7;
-                  const playPromise = audio.play();
-                  if (playPromise !== undefined) {
-                     playPromise.catch(() => {
-                        // Mobile fallback Audio object
-                        const fallbackAudio = new Audio(randomAudio);
-                        fallbackAudio.volume = 0.7;
-                        fallbackAudio.play().catch(() => { });
-                     });
-                  }
-               } catch (e) { }
-            }
+            playCelebration(UNSOLD_SONG, { volume: 0.7, fadeInMs: 1200 });
          }
-      } else {
-         lastHandledSoundStatusRef.current = null;
-         const audio = celebrationAudioRef.current;
-         if (audio) {
-            audio.pause();
-            audio.currentTime = 0;
-         }
-      }
+       } else {
+          lastHandledSoundStatusRef.current = null;
+          stopCelebration(500);
+       }
 
-      return () => {
-         if (rafId) cancelAnimationFrame(rafId);
-      };
+       return () => {
+          cancelled = true;
+          if (rafId) cancelAnimationFrame(rafId);
+          // Don't kill fades here — status flips (sold→bidding) drive the
+          // next playCelebration/stopCelebration, which take over the timer.
+       };
    }, [displayAuctionState?.status, displayAuctionState?.highBidderTeamId, displayAuctionState?.playerId, displayAuctionState?.currentBid]);
 
 
@@ -834,10 +941,46 @@ const AuctionRoom = () => {
       }, 200);
 
       return () => clearInterval(interval);
-   }, [displayAuctionState?.timerEndsAt, displayAuctionState?.status, currentAuction?.status, isAdmin, id, endPlayerAuction, getSyncedTime]);
+    }, [displayAuctionState?.timerEndsAt, displayAuctionState?.status, currentAuction?.status, isAdmin, id, endPlayerAuction, getSyncedTime]);
 
-   const handleBid = async () => {
-      if (displayAuctionState?.highBidderId === user?.uid) return;
+    // Stall watchdog (admin only): heals the two ways an auction can freeze —
+    // (a) timer expired but the end never fired (throttled tab, dropped call),
+    // (b) sold/unsold celebration never advanced (tab closed mid-celebration).
+    // Both recovery calls are fenced server-side, so this is safe to retry.
+    const stuckTrackerRef = useRef({ key: null, since: 0 });
+    useEffect(() => {
+       if (!isAdmin || currentAuction?.status !== 'active') return;
+       const st = displayAuctionState?.status;
+       if (st !== 'bidding' && st !== 'sold' && st !== 'unsold') return;
+
+       const watchdog = setInterval(() => {
+          if (st === 'bidding') {
+             const endsAt = displayAuctionState?.timerEndsAt;
+             if (endsAt && getSyncedTime() - endsAt > 4000) {
+                endTriggeredRef.current = false;
+                endPlayerAuction(id);
+             }
+          } else {
+             const key = `${displayAuctionState?.playerId}_${st}`;
+             if (stuckTrackerRef.current.key !== key) {
+                stuckTrackerRef.current = { key, since: Date.now() };
+             } else if (Date.now() - stuckTrackerRef.current.since > 20000) {
+                stuckTrackerRef.current = { key, since: Date.now() };
+                advanceToNextPlayer(id, { playerId: displayAuctionState?.playerId, status: st });
+             }
+          }
+       }, 2500);
+
+       return () => clearInterval(watchdog);
+    }, [isAdmin, currentAuction?.status, displayAuctionState?.status, displayAuctionState?.playerId, displayAuctionState?.timerEndsAt, id, endPlayerAuction, advanceToNextPlayer, getSyncedTime]);
+
+    const [isBidding, setIsBidding] = useState(false);
+
+    const handleBid = async () => {
+       if (displayAuctionState?.highBidderId === user?.uid) return;
+       // In-flight lock: on slow networks double-taps would otherwise fire
+       // two sequential transactions and make you outbid yourself.
+       if (isBidding) return;
 
       // Budget Guard
       if ((team?.budgetRemaining || 0) < nextBidAmount) {
@@ -886,14 +1029,17 @@ const AuctionRoom = () => {
          timerEndsAt: getSyncedTime() + (currentAuction?.settings?.bidTimer || 10) * 1000
       });
 
+      setIsBidding(true);
       try {
          await placeBid(nextBidAmount);
       } catch (err) {
          setOptimisticState(null);
          setError(err.message);
          setTimeout(() => setError(''), 3000);
+      } finally {
+         setIsBidding(false);
       }
-   };
+    };
 
    const copyRoomId = () => {
       navigator.clipboard.writeText(id);
@@ -1263,8 +1409,14 @@ const AuctionRoom = () => {
 
                {/* Center Scrollable Main Body */}
                <main className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center custom-scrollbar">
-                  <div className="w-full max-w-4xl flex flex-col gap-4 md:gap-6">
-                     <AnimatePresence mode="wait">
+                   <div className="w-full max-w-4xl flex flex-col gap-4 md:gap-6">
+                      {!isOnline && (
+                         <div className="w-full flex items-center justify-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-2xl px-4 py-2.5">
+                            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                            <span className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em]">Reconnecting… bidding paused until you're back</span>
+                         </div>
+                      )}
+                      <AnimatePresence mode="wait">
                         {(displayAuctionState?.status === 'sold' || displayAuctionState?.status === 'unsold') ? (
                            <motion.div
                               key="celebration"
@@ -1307,7 +1459,7 @@ const AuctionRoom = () => {
                                  </div>
                                   <div className="p-4 sm:p-6 md:p-10 flex flex-col md:flex-row items-center gap-4 sm:gap-6 md:gap-10">
                                      <div className="w-36 sm:w-44 md:w-60 aspect-[3/4] bg-gradient-to-b from-white/10 to-transparent rounded-2xl md:rounded-[2rem] overflow-hidden border border-white/10 relative z-10 shadow-[0_12px_40px_rgba(0,0,0,0.4)] shrink-0">
-                                        <img src={currentPlayer.image} alt={currentPlayer.name} decoding="async" className="w-full h-full object-cover object-top" />
+                                        <img src={currentPlayer.image} alt={currentPlayer.name} decoding="async" loading="lazy" className="w-full h-full object-cover object-top" onError={(e) => { e.target.onerror = null; e.target.src = 'https://api.dicebear.com/7.x/initials/svg?seed=' + encodeURIComponent(currentPlayer.name || 'Player'); }} />
                                      </div>
                                      <div className="flex-1 flex flex-col gap-4 md:gap-6 w-full text-center md:text-left">
                                         <div>
@@ -1359,13 +1511,13 @@ const AuctionRoom = () => {
                                   <div className="bg-black/20 border-t border-white/5 p-3 sm:p-4 md:p-6 flex gap-3 md:gap-4">
                                      <button
                                         onClick={handleBid}
-                                        disabled={timeLeft === 0 || displayAuctionState?.status !== 'bidding' || displayAuctionState?.highBidderId === user?.uid}
+                                        disabled={timeLeft === 0 || isBidding || !isOnline || displayAuctionState?.status !== 'bidding' || displayAuctionState?.highBidderId === user?.uid}
                                         className={`flex-1 h-14 md:h-16 font-black text-[15px] sm:text-base md:text-xl leading-tight px-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:opacity-50 disabled:grayscale cursor-pointer ${displayAuctionState?.highBidderId === user?.uid
                                            ? 'bg-white/5 text-green-500 border border-green-500/20 shadow-inner'
                                            : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-[#050505] shadow-[0_4px_20px_rgba(34,197,94,0.2)] hover:shadow-[0_8px_30px_rgba(34,197,94,0.3)]'
                                            }`}
                                      >
-                                        {displayAuctionState?.status === 'paused' ? 'PAUSED' : displayAuctionState?.highBidderId === user?.uid ? "LEADING BIDDER" : `PLACE BID: ₹${nextBidAmount.toFixed(2)} Cr`}
+                                        {!isOnline ? 'RECONNECTING…' : isBidding ? 'PLACING BID…' : displayAuctionState?.status === 'paused' ? 'PAUSED' : displayAuctionState?.highBidderId === user?.uid ? "LEADING BIDDER" : `PLACE BID: ₹${nextBidAmount.toFixed(2)} Cr`}
                                      </button>
                                      <button onClick={() => setShowPlayersOverlay(true)} className="w-14 h-14 md:w-16 md:h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-all shrink-0"><List size={20} /></button>
                                   </div>
@@ -1391,18 +1543,8 @@ const AuctionRoom = () => {
                      <span className="text-[10px] uppercase tracking-widest">Live Activity</span>
                   </button>
                    <button
-                      onClick={() => setSidebarTab('chat')}
-                      className={`h-full flex-1 flex items-center justify-center gap-2 transition-all cursor-pointer ${sidebarTab === 'chat'
-                         ? 'bg-white/[0.04] text-white border-b-2 border-white/60 font-black'
-                         : 'text-gray-500 hover:text-gray-400 hover:bg-white/[0.01] border-b-2 border-transparent font-bold'
-                         }`}
-                   >
-                      <MessageSquare size={14} />
-                      <span className="text-[10px] uppercase tracking-widest">Chat</span>
-                   </button>
-                   <button
-                      onClick={() => setSidebarTab('voice')}
-                      className={`h-full flex-1 flex items-center justify-center gap-2 transition-all cursor-pointer ${sidebarTab === 'voice'
+                      onClick={() => setSidebarTab('connect')}
+                      className={`h-full flex-1 flex items-center justify-center gap-2 transition-all cursor-pointer ${sidebarTab === 'connect'
                          ? 'bg-white/[0.04] text-white border-b-2 border-white/60 font-black'
                          : 'text-gray-500 hover:text-gray-400 hover:bg-white/[0.01] border-b-2 border-transparent font-bold'
                          }`}
@@ -1413,7 +1555,12 @@ const AuctionRoom = () => {
                             <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                          )}
                       </span>
-                      <span className="text-[10px] uppercase tracking-widest">Voice</span>
+                      <span className="text-[10px] uppercase tracking-widest">Connect</span>
+                      {unreadChat > 0 && (
+                         <span className="min-w-4 h-4 px-1 rounded-full bg-green-500 text-black text-[8px] font-black flex items-center justify-center">
+                            {unreadChat > 9 ? '9+' : unreadChat}
+                         </span>
+                      )}
                    </button>
                </div>
 
@@ -1509,25 +1656,15 @@ const AuctionRoom = () => {
                               )}
                            </div>
                         </motion.div>
-                      ) : sidebarTab === 'chat' ? (
-                         <motion.div
-                            key="chat"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="flex-1 flex flex-col min-h-0 h-full p-2"
-                         >
-                            <TextChat roomId={id} />
-                         </motion.div>
                       ) : (
                          <motion.div
-                            key="voice"
+                            key="connect"
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
                             className="flex-1 flex flex-col min-h-0 h-full"
                          >
-                            <VoiceChat roomId={id} onJoinedChange={setVoiceJoined} />
+                            <ConnectPanel roomId={id} onJoinedChange={setVoiceJoined} />
                          </motion.div>
                       )}
                   </AnimatePresence>
@@ -1552,7 +1689,22 @@ const AuctionRoom = () => {
                   <span className={`text-[10px] font-black uppercase tracking-[0.2em] transition-all mt-1 ${mobileTab === 'arena' ? 'text-yellow-500' : 'text-gray-500'}`}>Arena</span>
                </button>
 
-               <button onClick={() => setMobileTab('activity')} aria-label="Logs" className={`flex flex-col items-center justify-center w-16 min-h-[56px] gap-0.5 transition-all duration-300 ${mobileTab === 'activity' ? 'text-green-500 translate-y-0' : 'text-gray-500 hover:text-gray-400 translate-y-0.5'}`}>
+                <button onClick={() => { setMobileTab('activity'); setSidebarTab('connect'); }} aria-label="Chat" className={`flex flex-col items-center justify-center w-16 min-h-[56px] gap-0.5 transition-all duration-300 relative ${mobileTab === 'activity' && sidebarTab === 'connect' ? 'text-green-500 translate-y-0' : 'text-gray-500 hover:text-gray-400 translate-y-0.5'}`}>
+                   <div className={`p-1 rounded-lg transition-colors duration-300 relative ${mobileTab === 'activity' && sidebarTab === 'connect' ? 'bg-green-500/10' : 'bg-transparent'}`}>
+                      <Mic size={18} strokeWidth={mobileTab === 'activity' && sidebarTab === 'connect' ? 2.5 : 2} />
+                      {unreadChat > 0 && (
+                         <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-green-500 text-black text-[8px] font-black flex items-center justify-center">
+                            {unreadChat > 9 ? '9+' : unreadChat}
+                         </span>
+                      )}
+                      {voiceJoined && (
+                         <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-500 border border-black animate-pulse" />
+                      )}
+                   </div>
+                   <span className={`text-[10px] font-black uppercase tracking-widest ${mobileTab === 'activity' && sidebarTab === 'connect' ? 'opacity-100' : 'opacity-70'}`}>Chat</span>
+                </button>
+
+                <button onClick={() => setMobileTab('activity')} aria-label="Logs" className={`flex flex-col items-center justify-center w-16 min-h-[56px] gap-0.5 transition-all duration-300 ${mobileTab === 'activity' ? 'text-green-500 translate-y-0' : 'text-gray-500 hover:text-gray-400 translate-y-0.5'}`}>
                   <div className={`p-1 rounded-lg transition-colors duration-300 ${mobileTab === 'activity' ? 'bg-green-500/10' : 'bg-transparent'}`}>
                      <History size={18} strokeWidth={mobileTab === 'activity' ? 2.5 : 2} />
                   </div>
@@ -1784,10 +1936,12 @@ const SoldCard = ({ msg }) => {
    const team = TEAMS.find(t => t.id === msg.metadata.teamId);
    const slogan = TEAM_SLOGANS[msg.metadata.teamId] || { slogan: 'IPL 2025!', hashtag: '#IPL' };
 
-   const handleSave = async () => {
-      if (cardRef.current === null) return;
-      try {
-         const dataUrl = await toPng(cardRef.current, { 
+    const handleSave = async () => {
+       if (cardRef.current === null) return;
+       try {
+          // Loaded on demand — html-to-image never ships in the main bundle.
+          const { toPng } = await import('html-to-image');
+          const dataUrl = await toPng(cardRef.current, { 
             cacheBust: false, 
             pixelRatio: 2, 
             skipFonts: true,

@@ -46,6 +46,12 @@
             ".write": "auth != null && auth.uid == $userId"
           }
         },
+        "typing": {
+          "$userId": {
+            // Chat typing indicators: users may only publish their own entry
+            ".write": "auth != null && auth.uid == $userId"
+          }
+        },
         "voice": {
           "$userId": {
             // Voice-chat roster: users may only publish their own entry

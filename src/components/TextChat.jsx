@@ -1,44 +1,121 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuction } from '../contexts/AuctionContext';
 import { useAuth } from '../contexts/AuthContext';
+import { rtdb } from '../lib/firebase';
+import { ref, set, remove, onValue, onDisconnect } from 'firebase/database';
 import { TEAMS } from '../data/teams';
-import { Send, MessageSquare, ChevronUp, ChevronDown, Image as ImageIcon } from 'lucide-react';
+import { Send, MessageSquare, ChevronUp, ChevronDown, ArrowDown, Image as ImageIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 
 const GIPHY_API_KEY = import.meta.env.VITE_GIPHY_API_KEY;
+const REACTION_EMOJIS = ['❤️', '😂', '🔥', '👏', '😮'];
+
+const formatTime = (ts) => {
+   if (!ts || typeof ts !== 'number') return '';
+   try {
+      return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+   } catch (e) {
+      return '';
+   }
+};
 
 const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
-   const { messages, sendMessage } = useAuction();
+   const { messages, sendMessage, toggleReaction } = useAuction();
    const { user } = useAuth();
    const [text, setText] = useState('');
+   const [typingUsers, setTypingUsers] = useState([]);
+   const [reactFor, setReactFor] = useState(null);
+   const [showJump, setShowJump] = useState(false);
    const scrollContainerRef = useRef(null);
+   const stickRef = useRef(true);
+   const typingTimerRef = useRef(null);
 
    // Filter only text and gif chat messages
-   const chatMessages = messages.filter(m => m.type === 'text' || m.type === 'gif' || !m.type);
+   const chatMessages = useMemo(
+      () => messages.filter(m => m.type === 'text' || m.type === 'gif' || !m.type),
+      [messages]
+   );
 
-    const scrollToBottom = () => {
-       const el = scrollContainerRef.current;
-       if (!el) return;
-       // Defer the write to the next frame so it doesn't force a sync
-       // reflow in the middle of React's commit phase.
-       requestAnimationFrame(() => {
-          el.scrollTop = el.scrollHeight;
-       });
-    };
+   const scrollToBottom = (force) => {
+      const el = scrollContainerRef.current;
+      if (!el) return;
+      if (force) stickRef.current = true;
+      // Deferred to the next frame so the write never forces a sync
+      // reflow in the middle of React's commit phase.
+      requestAnimationFrame(() => {
+         el.scrollTop = el.scrollHeight;
+      });
+      if (force) setShowJump(false);
+   };
 
+   // Stick to bottom only while the user is already near the bottom, so
+   // reading history never gets yanked away by live messages.
+   const handleScroll = () => {
+      const el = scrollContainerRef.current;
+      if (!el) return;
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      stickRef.current = nearBottom;
+      setShowJump(!nearBottom && chatMessages.length > 0);
+   };
 
    useEffect(() => {
-      scrollToBottom();
+      if (stickRef.current) scrollToBottom();
    }, [chatMessages.length]);
+
+   // Typing presence: publish while typing, auto-clear when idle.
+   useEffect(() => {
+      if (!roomId || !user?.uid) return;
+      const listRef = ref(rtdb, `auctions/${roomId}/typing`);
+      const off = onValue(listRef, (snap) => {
+         const val = snap.val() || {};
+         const now = Date.now();
+         setTypingUsers(
+            Object.entries(val)
+               .filter(([id, t]) => id !== user.uid && t && now - (t.ts || 0) < 6000)
+               .map(([id, t]) => ({ uid: id, ...t }))
+         );
+      });
+      return () => off();
+   }, [roomId, user?.uid]);
+
+   useEffect(() => {
+      return () => {
+         if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+         if (roomId && user?.uid) {
+            remove(ref(rtdb, `auctions/${roomId}/typing/${user.uid}`)).catch(() => {});
+         }
+      };
+   }, [roomId, user?.uid]);
+
+   const handleTyping = (val) => {
+      setText(val);
+      if (!roomId || !user?.uid) return;
+      const meRef = ref(rtdb, `auctions/${roomId}/typing/${user.uid}`);
+      if (val.trim()) {
+         set(meRef, { name: user.displayName || 'Manager', ts: Date.now() }).catch(() => {});
+         onDisconnect(meRef).remove().catch(() => {});
+         if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+         typingTimerRef.current = setTimeout(() => {
+            remove(meRef).catch(() => {});
+         }, 2500);
+      } else {
+         if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+         remove(meRef).catch(() => {});
+      }
+   };
 
    const handleSend = async (e) => {
       e.preventDefault();
       if (!text.trim() || !roomId) return;
-      
+
       try {
          await sendMessage(roomId, text.trim(), 'text');
          setText('');
+         if (user?.uid) {
+            remove(ref(rtdb, `auctions/${roomId}/typing/${user.uid}`)).catch(() => {});
+         }
+         scrollToBottom(true);
       } catch (err) {
          // Send failed silently or handled by context
       }
@@ -55,7 +132,7 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
          const url = query.trim()
             ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query.trim())}&limit=16&rating=g`
             : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_API_KEY}&limit=16&rating=g`;
-            
+
          const res = await fetch(url);
          const json = await res.json();
          if (json && json.data) {
@@ -87,7 +164,7 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
    }, [showGifPicker]);
 
    return (
-      <div className="relative flex flex-col h-full bg-transparent w-full">
+      <div className="relative flex flex-col flex-1 min-h-0 bg-transparent w-full">
          {onToggleCollapse && (
             <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/[0.01]">
                <button
@@ -104,7 +181,12 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
          {!isCollapsed && (
             <>
                {/* Messages Scroll Area */}
-               <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar flex flex-col min-h-0">
+               <div
+                  ref={scrollContainerRef}
+                  onScroll={handleScroll}
+                  className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-3 custom-scrollbar flex flex-col min-h-0"
+                  style={{ WebkitOverflowScrolling: 'touch' }}
+               >
                   {chatMessages.length === 0 ? (
                      <div className="flex-1 flex flex-col items-center justify-center opacity-30 p-8 text-center my-auto">
                         <MessageSquare size={24} className="text-gray-500 mb-2 animate-pulse" />
@@ -114,9 +196,12 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                   ) : (
                      chatMessages.map((msg, index) => {
                         const isMe = msg.userId === user?.uid;
-                        
+
                         // Find bidder's team logo
-                        const userTeamId = TEAMS.find(t => t.id === msg.teamId || t.name === msg.teamId)?.logo;
+                        const userTeamLogo = TEAMS.find(t => t.id === msg.teamId || t.name === msg.teamId)?.logo;
+                        const timeLabel = formatTime(msg.timestamp);
+                        const reactions = msg.reactions || {};
+                        const reactionEntries = Object.entries(reactions).filter(([, users]) => users && Object.keys(users).length > 0);
 
                         return (
                            <motion.div
@@ -136,12 +221,16 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                                           {msg.teamId}
                                        </span>
                                     )}
+                                    {timeLabel && (
+                                       <span className="text-[7px] font-bold text-gray-600">{timeLabel}</span>
+                                    )}
                                  </div>
                               )}
 
-                              {/* Speech Bubble */}
+                              {/* Speech Bubble (tap for reactions) */}
                               <div
-                                 className={`rounded-2xl text-[11px] leading-relaxed break-words shadow-lg overflow-hidden ${
+                                 onClick={() => msg.id && setReactFor(reactFor === msg.id ? null : msg.id)}
+                                 className={`rounded-2xl text-[11px] leading-relaxed break-words shadow-lg overflow-hidden cursor-pointer ${
                                     msg.type === 'gif' || (msg.text?.startsWith('http') && msg.text?.includes('.gif'))
                                        ? 'border border-white/10 max-w-[200px]'
                                        : isMe
@@ -150,16 +239,95 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                                  }`}
                               >
                                  {msg.type === 'gif' || (msg.text?.startsWith('http') && msg.text?.includes('.gif')) ? (
-                                    <img src={msg.text} alt="gif" className="w-full h-auto object-cover block" />
+                                    <img
+                                       src={msg.text}
+                                       alt="gif"
+                                       loading="lazy"
+                                       className="w-full h-auto object-cover block"
+                                       onLoad={() => { if (stickRef.current) scrollToBottom(); }}
+                                    />
                                  ) : (
                                     msg.text
                                  )}
                               </div>
+
+                              {/* Timestamp for own messages */}
+                              {isMe && timeLabel && (
+                                 <span className="text-[7px] font-bold text-gray-600 mt-0.5 px-1">{timeLabel}</span>
+                              )}
+
+                              {/* Emoji picker */}
+                              {reactFor === msg.id && (
+                                 <div className="flex gap-1 mt-1.5 bg-black/60 border border-white/10 rounded-full px-2 py-1 backdrop-blur-md">
+                                    {REACTION_EMOJIS.map((emoji) => (
+                                       <button
+                                          key={emoji}
+                                          type="button"
+                                          onClick={(e) => {
+                                             e.stopPropagation();
+                                             toggleReaction(roomId, msg.id, emoji).catch(() => {});
+                                             setReactFor(null);
+                                          }}
+                                          className="text-sm hover:scale-125 active:scale-95 transition-transform cursor-pointer"
+                                       >
+                                          {emoji}
+                                       </button>
+                                    ))}
+                                 </div>
+                              )}
+
+                              {/* Reaction chips */}
+                              {reactionEntries.length > 0 && (
+                                 <div className="flex gap-1 mt-1 flex-wrap">
+                                    {reactionEntries.map(([emoji, users]) => {
+                                       const uids = Object.keys(users);
+                                       const mine = !!(user && users[user.uid]);
+                                       return (
+                                          <button
+                                             key={emoji}
+                                             type="button"
+                                             onClick={() => toggleReaction(roomId, msg.id, emoji).catch(() => {})}
+                                             className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border transition-all active:scale-95 cursor-pointer ${mine
+                                                ? 'bg-white/15 border-white/30'
+                                                : 'bg-white/5 border-white/10 hover:border-white/25'}`}
+                                          >
+                                             <span>{emoji}</span>
+                                             <span className="font-black text-gray-300">{uids.length}</span>
+                                          </button>
+                                       );
+                                    })}
+                                 </div>
+                              )}
                            </motion.div>
                         );
                      })
                   )}
                </div>
+
+               {/* Jump to latest pill */}
+               {showJump && (
+                  <button
+                     type="button"
+                     onClick={() => scrollToBottom(true)}
+                     className="absolute bottom-20 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-white text-black text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-2xl transition-all active:scale-95 cursor-pointer z-10"
+                  >
+                     <ArrowDown size={12} /> New messages
+                  </button>
+               )}
+
+               {/* Typing indicator */}
+               {typingUsers.length > 0 && (
+                  <div className="px-4 pb-1 flex items-center gap-1.5">
+                     <span className="flex gap-0.5">
+                        <span className="w-1 h-1 rounded-full bg-gray-400 animate-bounce" />
+                        <span className="w-1 h-1 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0.15s' }} />
+                        <span className="w-1 h-1 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0.3s' }} />
+                     </span>
+                     <span className="text-[8px] font-bold text-gray-500 uppercase tracking-widest truncate">
+                        {typingUsers.slice(0, 2).map(t => t.name).join(', ')}{typingUsers.length > 2 ? ` +${typingUsers.length - 2}` : ''} typing…
+                     </span>
+                  </div>
+               )}
 
                {/* Message Input Box */}
                <form onSubmit={handleSend} className="p-3 border-t border-white/5 bg-white/[0.01] flex gap-2 relative">
@@ -174,7 +342,7 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                   <input
                      type="text"
                      value={text}
-                     onChange={(e) => setText(e.target.value)}
+                     onChange={(e) => handleTyping(e.target.value)}
                      placeholder="Type a message..."
                      className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-[11px] text-white focus:outline-none focus:border-white/30 transition-colors placeholder:text-gray-700"
                      maxLength={150}
@@ -244,7 +412,7 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                                  }}
                                  className="relative rounded-lg overflow-hidden border border-white/5 hover:border-white/30 aspect-video group cursor-pointer transition-all active:scale-95 bg-white/5"
                               >
-                                 <img src={gif.url} alt={gif.name} className="w-full h-full object-cover animate-pulse" />
+                                 <img src={gif.url} alt={gif.name} loading="lazy" className="w-full h-full object-cover" />
                                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                                     <span className="text-[7px] font-black text-white uppercase tracking-tight truncate max-w-[90%] px-1">{gif.name}</span>
                                  </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { db } from '../lib/firebase';
+import { getDb } from '../lib/firebase';
 import { doc, setDoc, onSnapshot, runTransaction } from 'firebase/firestore';
 import { IPL_PLAYERS } from '../data/players';
 import { 
@@ -28,21 +28,28 @@ const FantasyAdmin = () => {
   // Sync data from Firestore
   useEffect(() => {
     if (!user || user.email !== ADMIN_EMAIL) return;
-    // Averages (Existing playerPoints document)
-    const avgRef = doc(db, 'fantasyConfig', 'playerPoints');
-    const unsubAvg = onSnapshot(avgRef, (snap) => {
-      if (snap.exists()) setPlayerAverages(snap.data());
-    });
+    let unsubAvg = null;
+    let unsubMatch = null;
+    let cancelled = false;
+    getDb().then((db) => {
+      if (cancelled) return;
+      // Averages (Existing playerPoints document)
+      const avgRef = doc(db, 'fantasyConfig', 'playerPoints');
+      unsubAvg = onSnapshot(avgRef, (snap) => {
+        if (snap.exists()) setPlayerAverages(snap.data());
+      });
 
-    // Match Counts (New metadata document)
-    const matchRef = doc(db, 'fantasyConfig', 'playerMatches');
-    const unsubMatch = onSnapshot(matchRef, (snap) => {
-      if (snap.exists()) setPlayerMatches(snap.data());
-    });
+      // Match Counts (New metadata document)
+      const matchRef = doc(db, 'fantasyConfig', 'playerMatches');
+      unsubMatch = onSnapshot(matchRef, (snap) => {
+        if (snap.exists()) setPlayerMatches(snap.data());
+      });
+    }).catch(() => {});
 
     return () => {
-      unsubAvg();
-      unsubMatch();
+      cancelled = true;
+      if (unsubAvg) unsubAvg();
+      if (unsubMatch) unsubMatch();
     };
   }, [user, ADMIN_EMAIL]);
 
@@ -57,8 +64,9 @@ const FantasyAdmin = () => {
   const handleNewMatchPoint = async (playerId, todayPoints) => {
     if (isNaN(todayPoints)) return;
     setIsUpdating(true);
-    
+
     try {
+      const db = await getDb();
       const avgRef = doc(db, 'fantasyConfig', 'playerPoints');
       const matchRef = doc(db, 'fantasyConfig', 'playerMatches');
 
@@ -95,12 +103,14 @@ const FantasyAdmin = () => {
 
   const setManualAverage = async (playerId, value) => {
     if (isNaN(value)) return;
+    const db = await getDb();
     const avgRef = doc(db, 'fantasyConfig', 'playerPoints');
     await setDoc(avgRef, { ...playerAverages, [playerId]: Number(value) }, { merge: true });
   };
 
   const setManualMatches = async (playerId, value) => {
     if (isNaN(value)) return;
+    const db = await getDb();
     const matchRef = doc(db, 'fantasyConfig', 'playerMatches');
     await setDoc(matchRef, { ...playerMatches, [playerId]: Number(value) }, { merge: true });
   };

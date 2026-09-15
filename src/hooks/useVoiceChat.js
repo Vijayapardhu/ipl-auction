@@ -3,6 +3,7 @@ import { rtdb } from '../lib/firebase';
 import {
   ref,
   set,
+  get,
   update,
   push,
   remove,
@@ -49,6 +50,7 @@ export const isVoiceSupported = () =>
 export const useVoiceChat = ({ roomId, user, displayName, teamId, teamName }) => {
   const [joined, setJoined] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [activeRoomId, setActiveRoomId] = useState(null);
   const [muted, setMuted] = useState(false);
   const [peers, setPeers] = useState([]); // voice presence (others): [{ uid, name, teamId, teamName, muted }]
   const [connectedUids, setConnectedUids] = useState([]); // peers with live audio flowing
@@ -61,12 +63,15 @@ export const useVoiceChat = ({ roomId, user, displayName, teamId, teamName }) =>
   const offFnsRef = useRef([]);
   const retryTimersRef = useRef(new Map()); // peerUid -> timeout id
 
-  const myUid = user?.uid;
-  const metaRef = useRef({ roomId, myUid, displayName, teamId, teamName });
-  metaRef.current = { roomId, myUid, displayName, teamId, teamName };
-
-  const voicePath = roomId ? `auctions/${roomId}/voice` : null;
-  const inboxPath = roomId && myUid ? `auctions/${roomId}/voice-signals/${myUid}` : null;
+  // Identity mirror. Syncs from props only when they carry real values, so
+  // join() overrides (persistent-provider pattern) are never clobbered by
+  // a re-render.
+  const metaRef = useRef({ roomId, myUid: user?.uid, displayName, teamId, teamName });
+  if (roomId) metaRef.current.roomId = roomId;
+  if (user?.uid) metaRef.current.myUid = user.uid;
+  if (displayName) metaRef.current.displayName = displayName;
+  if (teamId !== undefined && teamId !== null) metaRef.current.teamId = teamId;
+  if (teamName !== undefined && teamName !== null) metaRef.current.teamName = teamName;
 
   const markConnected = useCallback((uid, on) => {
     setConnectedUids((prev) => {
@@ -198,6 +203,12 @@ export const useVoiceChat = ({ roomId, user, displayName, teamId, teamName }) =>
     const from = msg.from;
     try {
       if (msg.kind === 'offer' && msg.sdp) {
+        // Only negotiate with peers actually present on this room's voice
+        // roster (the server rule now permits any authed sender).
+        try {
+          const present = await get(ref(rtdb, `auctions/${metaRef.current.roomId}/voice/${from}`));
+          if (!present.exists()) return;
+        } catch (e) { return; }
         const { pc } = ensurePc(from);
         const polite = self > from; // larger uid yields on glare
         if (!polite && pc.signalingState !== 'stable') return; // our offer wins
@@ -257,12 +268,18 @@ export const useVoiceChat = ({ roomId, user, displayName, teamId, teamName }) =>
     }
     setJoined(false);
     setJoining(false);
+    setActiveRoomId(null);
     setMuted(false);
     setPeers([]);
     setConnectedUids([]);
   }, [detachAll, teardownPeer]);
 
-  const join = useCallback(async () => {
+  const join = useCallback(async (override) => {
+    // Allow callers (e.g. a persistent provider) to join with fresh args
+    // without remounting the hook.
+    if (override) {
+      metaRef.current = { ...metaRef.current, ...override };
+    }
     const { roomId: rid, myUid: uid } = metaRef.current;
     const { displayName: nm, teamId: tid, teamName: tnm } = metaRef.current;
     if (!rid || !uid || joinedRef.current) return;
@@ -294,6 +311,7 @@ export const useVoiceChat = ({ roomId, user, displayName, teamId, teamName }) =>
       odb(presenceRef).remove().catch(() => {});
 
       joinedRef.current = true;
+      setActiveRoomId(rid);
 
       // Roster (everyone currently in voice, including us).
       const offRoster = onValue(ref(rtdb, `auctions/${rid}/voice`), (snap) => {
@@ -337,14 +355,18 @@ export const useVoiceChat = ({ roomId, user, displayName, teamId, teamName }) =>
   }, [handleSignal, teardownPeer]);
 
   // Dial newly discovered peers (smaller uid dials larger — deterministic, no glare).
+  // Reads identity from metaRef so a persistent provider can join rooms
+  // without remounting.
   useEffect(() => {
-    if (!joined || !myUid) return;
+    if (!joined) return;
+    const self = metaRef.current.myUid;
+    if (!self) return;
     peers.forEach((p) => {
-      if (p.uid > myUid && !pcsRef.current.has(p.uid)) {
+      if (p.uid > self && !pcsRef.current.has(p.uid)) {
         dialPeer(p.uid);
       }
     });
-  }, [peers, joined, myUid, dialPeer]);
+  }, [peers, joined, dialPeer]);
 
   const toggleMute = useCallback(async () => {
     const { roomId: rid, myUid: uid } = metaRef.current;
@@ -385,6 +407,7 @@ export const useVoiceChat = ({ roomId, user, displayName, teamId, teamName }) =>
     turnConfigured: isTurnConfigured(),
     joined,
     joining,
+    activeRoomId,
     muted,
     peers,
     connectedUids,

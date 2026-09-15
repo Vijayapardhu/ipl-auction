@@ -2,8 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useAuction } from '../contexts/AuctionContext';
-import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, documentId } from 'firebase/firestore';
+import { getDb, getFs } from '../lib/firebase';
 import { IPL_PLAYERS } from '../data/players';
 import { TEAMS } from '../data/teams';
 import {
@@ -126,6 +125,22 @@ const LandingPage = () => {
     }
   }, []);
 
+  // Prefetch the room chunks during idle time so entering a room feels
+  // instant. Skipped on metered connections.
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.connection?.saveData) return;
+    const prefetch = () => {
+      import('./AuctionRoom').catch(() => {});
+      import('./Lobby').catch(() => {});
+    };
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(prefetch, { timeout: 10000 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+    const timer = setTimeout(prefetch, 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Fetch auction history when user switches to history tab
   useEffect(() => {
     if (activeTab !== 'history' || !user?.uid || historyData.length > 0) return;
@@ -134,6 +149,9 @@ const LandingPage = () => {
     const fetchHistory = async () => {
       setHistoryLoading(true);
       try {
+        // Firestore loads here (history tab only) — never on first paint.
+        const { collection, query, where, getDocs, documentId } = await getFs();
+        const db = await getDb();
         const teamsQuery = query(
           collection(db, 'teams'),
           where('userId', '==', user.uid)

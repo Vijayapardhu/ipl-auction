@@ -6,7 +6,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { db, rtdb } from '../../lib/firebase';
+import { getDb, rtdb } from '../../lib/firebase';
 import { ref, onValue, update as updateRtdb, set as setRtdb, get as getRtdb } from 'firebase/database';
 import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
@@ -117,6 +117,7 @@ const FantasyDashboard = ({ auctionId, user, roomTeams = [], currentAuction }) =
     // Legacy Scanner for squads saved previously in Firestore or alternative RTDB paths
     const scanLegacySquads = async () => {
       try {
+        const db = await getDb();
         // 1. Check Firestore fantasySquads collection
         const q1 = query(collection(db, 'fantasySquads'), where('auctionId', '==', auctionId));
         const snap1 = await getDocs(q1);
@@ -208,24 +209,28 @@ const FantasyDashboard = ({ auctionId, user, roomTeams = [], currentAuction }) =
     if (cachedPlayerPoints) {
       setPlayerPoints(cachedPlayerPoints);
     } else {
-      const ppRef = doc(db, 'fantasyConfig', 'playerPoints');
-      getDoc(ppRef).then(snap => {
-        if (snap.exists()) {
-          cachedPlayerPoints = snap.data();
-          setPlayerPoints(cachedPlayerPoints);
-        }
+      getDb().then((db) => {
+        const ppRef = doc(db, 'fantasyConfig', 'playerPoints');
+        getDoc(ppRef).then(snap => {
+          if (snap.exists()) {
+            cachedPlayerPoints = snap.data();
+            setPlayerPoints(cachedPlayerPoints);
+          }
+        }).catch(handleFirebaseError);
       }).catch(handleFirebaseError);
     }
 
     if (cachedPlayerStats) {
       setPlayerStats(cachedPlayerStats);
     } else {
-      const statsRef = doc(db, 'fantasyConfig', 'playerStats');
-      getDoc(statsRef).then(snap => {
-        if (snap.exists()) {
-          cachedPlayerStats = snap.data();
-          setPlayerStats(cachedPlayerStats);
-        }
+      getDb().then((db) => {
+        const statsRef = doc(db, 'fantasyConfig', 'playerStats');
+        getDoc(statsRef).then(snap => {
+          if (snap.exists()) {
+            cachedPlayerStats = snap.data();
+            setPlayerStats(cachedPlayerStats);
+          }
+        }).catch(handleFirebaseError);
       }).catch(handleFirebaseError);
     }
 

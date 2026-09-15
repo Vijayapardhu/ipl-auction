@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
-import { Mic, MicOff, PhoneOff, Volume2, Loader2, Users } from 'lucide-react';
+import { Mic, MicOff, PhoneOff, Volume2, Loader2, Users, Repeat } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAuction } from '../contexts/AuctionContext';
-import { useVoiceChat } from '../hooks/useVoiceChat';
+import { useVoice } from '../contexts/VoiceContext';
 
 const PeerRow = ({ name, teamId, muted, connected, self }) => {
   const initial = (name || '?').trim().charAt(0).toUpperCase();
@@ -37,22 +37,26 @@ const PeerRow = ({ name, teamId, muted, connected, self }) => {
   );
 };
 
-const VoiceChat = ({ roomId, onJoinedChange }) => {
+const VoiceChat = ({ roomId, onJoinedChange, compact }) => {
   const { user } = useAuth();
   const { team } = useAuction();
   const {
-    supported, turnConfigured, joined, joining, muted, peers, connectedUids, error, join, leave, toggleMute,
-  } = useVoiceChat({
+    supported, turnConfigured, joined, joining, activeRoomId,
+    muted, peers, connectedUids, error, joinVoice, leave, toggleMute,
+  } = useVoice();
+  const teamId = team?.teamId || team?.team || '';
+  const joinArgs = {
     roomId,
     user,
     displayName: user?.displayName || 'Manager',
-    teamId: team?.teamId || team?.team || '',
+    teamId,
     teamName: team?.teamName || '',
-  });
+  };
+  const joinedHere = joined && activeRoomId === roomId;
 
   useEffect(() => {
-    if (onJoinedChange) onJoinedChange(joined);
-  }, [joined, onJoinedChange]);
+    if (onJoinedChange) onJoinedChange(joinedHere);
+  }, [joinedHere, onJoinedChange]);
 
   if (!supported) {
     return (
@@ -63,34 +67,77 @@ const VoiceChat = ({ roomId, onJoinedChange }) => {
     );
   }
 
-  if (!joined) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-green-500/10 border border-green-500/20 flex items-center justify-center mb-4">
-          <Mic size={24} className="text-green-400" />
+  if (!joinedHere) {
+    // In voice in a different room — offer to switch without losing context.
+    if (joined) {
+      return (
+        <div className={compact
+          ? "shrink-0 flex items-center gap-3 p-3"
+          : "flex-1 flex flex-col items-center justify-center p-6 text-center"}>
+          <div className={`${compact ? 'w-10 h-10 rounded-xl' : 'w-14 h-14 rounded-2xl'} bg-green-500/10 border border-green-500/20 flex items-center justify-center shrink-0 ${compact ? '' : 'mb-4'}`}>
+            <Volume2 size={compact ? 18 : 24} className="text-green-400" />
+          </div>
+          <div className={compact ? 'min-w-0 flex-1' : ''}>
+            <h4 className="text-sm font-black text-white uppercase tracking-widest mb-1">Voice Active Elsewhere</h4>
+            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest leading-relaxed truncate">
+              Talking in {activeRoomId}
+            </p>
+          </div>
+          <button
+            onClick={() => joinVoice(joinArgs)}
+            disabled={joining}
+            className={`${compact ? 'h-10 px-4 w-auto' : 'w-full h-12'} rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-[#050505] font-black uppercase tracking-[0.2em] text-xs shadow-[0_4px_20px_rgba(34,197,94,0.2)] transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 shrink-0`}
+          >
+            {joining ? <Loader2 size={16} className="animate-spin" /> : <Repeat size={16} />}
+            {joining ? 'Switching…' : 'Switch'}
+          </button>
+          {!compact && (
+            <button
+              onClick={leave}
+              className="mt-2 w-full h-10 rounded-xl text-[10px] font-black text-gray-500 hover:text-red-400 uppercase tracking-[0.2em] transition-colors cursor-pointer"
+            >
+              Leave Voice
+            </button>
+          )}
+          {error && <p className="mt-3 text-[10px] text-red-400 font-bold">{error}</p>}
         </div>
-        <h4 className="text-sm font-black text-white uppercase tracking-widest mb-1">Room Voice Chat</h4>
-        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-5 leading-relaxed">
-          Talk live with friends<br />during the auction
-        </p>
+      );
+    }
+    return (
+      <div className={compact
+        ? "shrink-0 flex items-center gap-3 p-3 text-left"
+        : "flex-1 flex flex-col items-center justify-center p-6 text-center"}>
+        <div className={`${compact ? 'w-10 h-10 rounded-xl' : 'w-14 h-14 rounded-2xl'} bg-green-500/10 border border-green-500/20 flex items-center justify-center shrink-0 ${compact ? '' : 'mb-4'}`}>
+          <Mic size={compact ? 18 : 24} className="text-green-400" />
+        </div>
+        <div className={compact ? 'min-w-0 flex-1' : ''}>
+          <h4 className="text-sm font-black text-white uppercase tracking-widest mb-1">Room Voice Chat</h4>
+          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest leading-relaxed">
+            Talk live with friends{compact ? '' : <><br />during the auction</>}
+          </p>
+        </div>
         <button
-          onClick={join}
+          onClick={() => joinVoice(joinArgs)}
           disabled={joining}
-          className="w-full h-12 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-[#050505] font-black uppercase tracking-[0.2em] text-xs shadow-[0_4px_20px_rgba(34,197,94,0.2)] transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+          className={`${compact ? 'h-10 px-5 w-auto' : 'w-full h-12'} rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-[#050505] font-black uppercase tracking-[0.2em] text-xs shadow-[0_4px_20px_rgba(34,197,94,0.2)] transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 shrink-0`}
         >
           {joining ? <Loader2 size={16} className="animate-spin" /> : <Mic size={16} />}
-          {joining ? 'Connecting Mic…' : 'Join Voice'}
+          {joining ? 'Connecting…' : 'Join'}
         </button>
-        <p className="text-[8px] text-gray-600 font-bold uppercase tracking-widest mt-3">
-          {peers.length > 0 ? `${peers.length} friend${peers.length === 1 ? '' : 's'} already in voice` : 'Best on Chrome / Edge'}
-        </p>
+        {!compact && (
+          <p className="text-[8px] text-gray-600 font-bold uppercase tracking-widest mt-3">
+            Best on Chrome / Edge
+          </p>
+        )}
         {error && <p className="mt-3 text-[10px] text-red-400 font-bold">{error}</p>}
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 p-3 sm:p-4 gap-3">
+    <div className={compact
+      ? "shrink-0 flex flex-col p-3 gap-2.5"
+      : "flex-1 flex flex-col min-h-0 p-3 sm:p-4 gap-3"}>
       <div className="flex items-center gap-2.5 bg-white/[0.02] border border-white/5 rounded-2xl p-3">
         <button
           onClick={toggleMute}
@@ -121,8 +168,8 @@ const VoiceChat = ({ roomId, onJoinedChange }) => {
         <div className="flex-1 h-px bg-white/5" />
       </div>
 
-      <div className="flex flex-col gap-2 overflow-y-auto custom-scrollbar">
-        <PeerRow name={user?.displayName || 'Manager'} teamId={team?.teamId || team?.team || ''} muted={muted} connected self />
+      <div className={`flex flex-col gap-2 custom-scrollbar ${compact ? 'overflow-y-auto max-h-36' : 'overflow-y-auto'}`}>
+        <PeerRow name={user?.displayName || 'Manager'} teamId={teamId} muted={muted} connected self />
         {peers.map((p) => (
           <PeerRow
             key={p.uid}
