@@ -52,11 +52,13 @@ export const useVoiceChat = ({ roomId, user, displayName, teamId, teamName }) =>
   const [joining, setJoining] = useState(false);
   const [activeRoomId, setActiveRoomId] = useState(null);
   const [muted, setMuted] = useState(false);
+  const [deviceMuted, setDeviceMuted] = useState(false);
   const [peers, setPeers] = useState([]); // voice presence (others): [{ uid, name, teamId, teamName, muted }]
   const [connectedUids, setConnectedUids] = useState([]); // peers with live audio flowing
   const [error, setError] = useState('');
 
   const localStreamRef = useRef(null);
+  const lastArgsRef = useRef(null);
   const pcsRef = useRef(new Map()); // peerUid -> { pc, pendingIce: [] }
   const audioElsRef = useRef(new Map()); // peerUid -> HTMLAudioElement
   const joinedRef = useRef(false);
@@ -269,6 +271,7 @@ export const useVoiceChat = ({ roomId, user, displayName, teamId, teamName }) =>
     setJoined(false);
     setJoining(false);
     setActiveRoomId(null);
+    setDeviceMuted(false);
     setMuted(false);
     setPeers([]);
     setConnectedUids([]);
@@ -280,6 +283,7 @@ export const useVoiceChat = ({ roomId, user, displayName, teamId, teamName }) =>
     if (override) {
       metaRef.current = { ...metaRef.current, ...override };
     }
+    lastArgsRef.current = { ...metaRef.current };
     const { roomId: rid, myUid: uid } = metaRef.current;
     const { displayName: nm, teamId: tid, teamName: tnm } = metaRef.current;
     if (!rid || !uid || joinedRef.current) return;
@@ -295,6 +299,24 @@ export const useVoiceChat = ({ roomId, user, displayName, teamId, teamName }) =>
       });
       localStreamRef.current = stream;
       stream.getAudioTracks().forEach((t) => { t.enabled = true; });
+
+      // Surface OS/browser-level mic mutes (user muted in system tray, no
+      // device, etc.) so "mic not working" is diagnosable in the UI.
+      setDeviceMuted(false);
+      stream.getAudioTracks().forEach((t) => {
+        t.onmute = () => setDeviceMuted(true);
+        t.onunmute = () => setDeviceMuted(false);
+        if (t.muted) setDeviceMuted(true);
+      });
+
+      // iOS Safari blocks remote <audio>.play() outside gestures: the join
+      // tap usually unlocks it, but replay on the next gestures as backup.
+      const unlockRemote = () => {
+        audioElsRef.current.forEach((el) => { el.play().catch(() => {}); });
+      };
+      ['pointerdown', 'keydown', 'touchend'].forEach((ev) =>
+        window.addEventListener(ev, unlockRemote, { once: true })
+      );
 
       // Drop any stale signals addressed to us from a previous session.
       remove(ref(rtdb, `auctions/${rid}/voice-signals/${uid}`)).catch(() => {});
@@ -380,6 +402,17 @@ export const useVoiceChat = ({ roomId, user, displayName, teamId, teamName }) =>
     }
   }, [muted]);
 
+  // Manual recovery: full leave + rejoin with the last-used identity.
+  // Fixes one-sided "I can't hear anyone" states (stale ICE, ghost peers).
+  const reconnect = useCallback(async () => {
+    const args = lastArgsRef.current;
+    if (!args?.roomId || !args?.user?.uid) return;
+    setError('');
+    await leave();
+    await join(args);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Leave voice when the room unmounts.
   useEffect(() => {
     return () => {
@@ -409,11 +442,13 @@ export const useVoiceChat = ({ roomId, user, displayName, teamId, teamName }) =>
     joining,
     activeRoomId,
     muted,
+    deviceMuted,
     peers,
     connectedUids,
     error,
     join,
     leave,
     toggleMute,
+    reconnect,
   };
 };

@@ -15,6 +15,7 @@ import {
    Share2,
     Copy,
     Mic,
+    MessageSquare,
     Settings as SettingsIcon,
    Home,
    Pause,
@@ -42,7 +43,10 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { TEAMS } from '../data/teams';
-import ConnectPanel from '../components/ConnectPanel';
+import TextChat from '../components/TextChat';
+import VoiceChat from '../components/VoiceChat';
+import AuctionMiniBar from '../components/AuctionMiniBar';
+import MiniChat from '../components/MiniChat';
 import PageLoader from '../components/PageLoader';
 
 const AuctionRoom = () => {
@@ -80,25 +84,30 @@ const AuctionRoom = () => {
    const [showSettings, setShowSettings] = useState(false);
    const [summaryTab, setSummaryTab] = useState('squads'); // squads, leaderboard
    const [showParticipantsOverlay, setShowParticipantsOverlay] = useState(false);
-    const [sidebarTab, setSidebarTab] = useState('activity'); // activity or connect
+    const [sidebarTab, setSidebarTab] = useState('activity'); // activity, chat or voice
     const [voiceJoined, setVoiceJoined] = useState(false);
     const [unreadChat, setUnreadChat] = useState(0);
+    const [miniChatOpen, setMiniChatOpen] = useState(false);
     const prevChatCountRef = useRef(0);
 
-    // Unread chat badge: counts chat messages arriving while Connect is closed.
+    // Unread chat badge: counts chat messages arriving while Chat is closed.
     const chatCount = useMemo(
        () => messages.filter(m => m.type === 'text' || m.type === 'gif' || !m.type).length,
        [messages]
     );
     useEffect(() => {
-       if (chatCount > prevChatCountRef.current && sidebarTab !== 'connect') {
+       if (chatCount > prevChatCountRef.current && sidebarTab !== 'chat') {
           setUnreadChat((c) => c + (chatCount - prevChatCountRef.current));
        }
        prevChatCountRef.current = chatCount;
     }, [chatCount, sidebarTab]);
     useEffect(() => {
-       if (sidebarTab === 'connect') setUnreadChat(0);
+       if (sidebarTab === 'chat') setUnreadChat(0);
     }, [sidebarTab]);
+    // Reading in the mini chat also clears the badge.
+    useEffect(() => {
+       if (miniChatOpen) setUnreadChat(0);
+    }, [miniChatOpen]);
    const audioRef = useRef(null);
    const celebrationAudioRef = useRef(null);
    const [newTimerValue, setNewTimerValue] = useState(currentAuction?.settings?.bidTimer || 10);
@@ -1543,8 +1552,25 @@ const AuctionRoom = () => {
                      <span className="text-[10px] uppercase tracking-widest">Live Activity</span>
                   </button>
                    <button
-                      onClick={() => setSidebarTab('connect')}
-                      className={`h-full flex-1 flex items-center justify-center gap-2 transition-all cursor-pointer ${sidebarTab === 'connect'
+                      onClick={() => setSidebarTab('chat')}
+                      className={`h-full flex-1 flex items-center justify-center gap-2 transition-all cursor-pointer ${sidebarTab === 'chat'
+                         ? 'bg-white/[0.04] text-white border-b-2 border-white/60 font-black'
+                         : 'text-gray-500 hover:text-gray-400 hover:bg-white/[0.01] border-b-2 border-transparent font-bold'
+                         }`}
+                   >
+                      <span className="relative">
+                         <MessageSquare size={14} />
+                         {unreadChat > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-green-500 text-black text-[8px] font-black flex items-center justify-center">
+                               {unreadChat > 9 ? '9+' : unreadChat}
+                            </span>
+                         )}
+                      </span>
+                      <span className="text-[10px] uppercase tracking-widest">Chat</span>
+                   </button>
+                   <button
+                      onClick={() => setSidebarTab('voice')}
+                      className={`h-full flex-1 flex items-center justify-center gap-2 transition-all cursor-pointer ${sidebarTab === 'voice'
                          ? 'bg-white/[0.04] text-white border-b-2 border-white/60 font-black'
                          : 'text-gray-500 hover:text-gray-400 hover:bg-white/[0.01] border-b-2 border-transparent font-bold'
                          }`}
@@ -1555,12 +1581,7 @@ const AuctionRoom = () => {
                             <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                          )}
                       </span>
-                      <span className="text-[10px] uppercase tracking-widest">Connect</span>
-                      {unreadChat > 0 && (
-                         <span className="min-w-4 h-4 px-1 rounded-full bg-green-500 text-black text-[8px] font-black flex items-center justify-center">
-                            {unreadChat > 9 ? '9+' : unreadChat}
-                         </span>
-                      )}
+                      <span className="text-[10px] uppercase tracking-widest">Voice</span>
                    </button>
                </div>
 
@@ -1656,15 +1677,38 @@ const AuctionRoom = () => {
                               )}
                            </div>
                         </motion.div>
-                      ) : (
+                      ) : sidebarTab === 'chat' ? (
                          <motion.div
-                            key="connect"
+                            key="chat"
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
                             className="flex-1 flex flex-col min-h-0 h-full"
                          >
-                            <ConnectPanel roomId={id} onJoinedChange={setVoiceJoined} />
+                            <AuctionMiniBar
+                               currentPlayer={currentPlayer}
+                               currentBid={displayAuctionState?.currentBid}
+                               highBidderId={displayAuctionState?.highBidderId}
+                               highBidderTeamId={displayAuctionState?.highBidderTeamId}
+                               nextBidAmount={nextBidAmount}
+                               timeLeft={timeLeft}
+                               status={displayAuctionState?.status}
+                               isBidding={isBidding}
+                               isOnline={isOnline}
+                               isLeading={displayAuctionState?.highBidderId === user?.uid}
+                               onBid={handleBid}
+                            />
+                            <TextChat roomId={id} />
+                         </motion.div>
+                      ) : (
+                         <motion.div
+                            key="voice"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="flex-1 flex flex-col min-h-0 h-full"
+                         >
+                            <VoiceChat roomId={id} onJoinedChange={setVoiceJoined} />
                          </motion.div>
                       )}
                   </AnimatePresence>
@@ -1672,49 +1716,47 @@ const AuctionRoom = () => {
             </aside>
          </div>
 
-         <div className="w-full shrink-0 bg-black/95 backdrop-blur-2xl border-t border-white/10 flex md:hidden z-50 pb-[max(0.75rem,env(safe-area-inset-bottom))] relative">
-            <div className="flex w-full h-14 items-center justify-around px-4">
-               <button onClick={() => setMobileTab('squad')} aria-label="Squads" className={`flex flex-col items-center justify-center w-16 min-h-[56px] gap-0.5 transition-all duration-300 ${mobileTab === 'squad' ? 'text-blue-500 translate-y-0' : 'text-gray-500 hover:text-gray-400 translate-y-0.5'}`}>
-                  <div className={`p-1 rounded-lg transition-colors duration-300 ${mobileTab === 'squad' ? 'bg-blue-500/10' : 'bg-transparent'}`}>
-                     <Users size={18} strokeWidth={mobileTab === 'squad' ? 2.5 : 2} />
-                  </div>
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${mobileTab === 'squad' ? 'opacity-100' : 'opacity-70'}`}>Squads</span>
-               </button>
+          <div className="w-full shrink-0 bg-black/95 backdrop-blur-2xl border-t border-white/10 flex md:hidden z-50 pb-[max(0.75rem,env(safe-area-inset-bottom))] relative">
+             <div className="flex w-full h-16 items-stretch justify-around px-3 pt-1.5">
+                <button onClick={() => setMobileTab('squad')} aria-label="Squads" className={`flex flex-col items-center justify-center w-16 gap-1 rounded-2xl transition-all duration-200 active:scale-95 cursor-pointer ${mobileTab === 'squad' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500 hover:text-gray-300'}`}>
+                   <Users size={20} strokeWidth={mobileTab === 'squad' ? 2.5 : 2} />
+                   <span className="text-[9px] font-black uppercase tracking-widest">Squads</span>
+                </button>
 
-               <button onClick={() => setMobileTab('arena')} aria-label="Arena" className="flex flex-col items-center justify-center w-20 min-h-[56px] relative group z-10 transition-transform active:scale-95">
-                  <div className={`p-2.5 rounded-xl transition-all duration-500 border relative overflow-hidden ${mobileTab === 'arena' ? 'bg-yellow-500 text-black border-yellow-400 shadow-[0_6px_15px_rgba(234,179,8,0.4)] scale-105' : 'bg-[#151515] border-white/10 text-gray-400 shadow-lg'}`}>
-                     {mobileTab === 'arena' && <div className="absolute inset-0 bg-white/20 blur-md pointer-events-none" />}
-                     <Gavel size={20} strokeWidth={2.5} className="relative z-10" />
-                  </div>
-                  <span className={`text-[10px] font-black uppercase tracking-[0.2em] transition-all mt-1 ${mobileTab === 'arena' ? 'text-yellow-500' : 'text-gray-500'}`}>Arena</span>
-               </button>
+                <button onClick={() => setMobileTab('arena')} aria-label="Arena" className="flex flex-col items-center justify-center w-20 gap-1 relative transition-transform active:scale-95 cursor-pointer">
+                   <div className={`p-2.5 rounded-2xl transition-all duration-300 border relative overflow-hidden ${mobileTab === 'arena' ? 'bg-yellow-500 text-black border-yellow-400 shadow-[0_6px_15px_rgba(234,179,8,0.4)]' : 'bg-[#151515] border-white/10 text-gray-400'}`}>
+                      {mobileTab === 'arena' && <div className="absolute inset-0 bg-white/20 blur-md pointer-events-none" />}
+                      <Gavel size={20} strokeWidth={2.5} className="relative z-10" />
+                   </div>
+                   <span className={`text-[9px] font-black uppercase tracking-[0.2em] transition-all ${mobileTab === 'arena' ? 'text-yellow-500' : 'text-gray-500'}`}>Arena</span>
+                </button>
 
-                <button onClick={() => { setMobileTab('activity'); setSidebarTab('connect'); }} aria-label="Chat" className={`flex flex-col items-center justify-center w-16 min-h-[56px] gap-0.5 transition-all duration-300 relative ${mobileTab === 'activity' && sidebarTab === 'connect' ? 'text-green-500 translate-y-0' : 'text-gray-500 hover:text-gray-400 translate-y-0.5'}`}>
-                   <div className={`p-1 rounded-lg transition-colors duration-300 relative ${mobileTab === 'activity' && sidebarTab === 'connect' ? 'bg-green-500/10' : 'bg-transparent'}`}>
-                      <Mic size={18} strokeWidth={mobileTab === 'activity' && sidebarTab === 'connect' ? 2.5 : 2} />
+                <button onClick={() => { setMobileTab('activity'); setSidebarTab('chat'); }} aria-label="Chat" className={`flex flex-col items-center justify-center w-16 gap-1 rounded-2xl transition-all duration-200 active:scale-95 cursor-pointer relative ${mobileTab === 'activity' && sidebarTab === 'chat' ? 'text-green-400 bg-green-500/10' : 'text-gray-500 hover:text-gray-300'}`}>
+                   <span className="relative">
+                      <MessageSquare size={20} strokeWidth={mobileTab === 'activity' && sidebarTab === 'chat' ? 2.5 : 2} />
                       {unreadChat > 0 && (
-                         <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-green-500 text-black text-[8px] font-black flex items-center justify-center">
+                         <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-green-500 text-black text-[8px] font-black flex items-center justify-center">
                             {unreadChat > 9 ? '9+' : unreadChat}
                          </span>
                       )}
-                      {voiceJoined && (
-                         <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-500 border border-black animate-pulse" />
+                      {voiceJoined && unreadChat === 0 && (
+                         <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-500 border border-black animate-pulse" />
                       )}
-                   </div>
-                   <span className={`text-[10px] font-black uppercase tracking-widest ${mobileTab === 'activity' && sidebarTab === 'connect' ? 'opacity-100' : 'opacity-70'}`}>Chat</span>
+                   </span>
+                   <span className="text-[9px] font-black uppercase tracking-widest">Chat</span>
                 </button>
 
-                <button onClick={() => setMobileTab('activity')} aria-label="Logs" className={`flex flex-col items-center justify-center w-16 min-h-[56px] gap-0.5 transition-all duration-300 ${mobileTab === 'activity' ? 'text-green-500 translate-y-0' : 'text-gray-500 hover:text-gray-400 translate-y-0.5'}`}>
-                  <div className={`p-1 rounded-lg transition-colors duration-300 ${mobileTab === 'activity' ? 'bg-green-500/10' : 'bg-transparent'}`}>
-                     <History size={18} strokeWidth={mobileTab === 'activity' ? 2.5 : 2} />
-                  </div>
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${mobileTab === 'activity' ? 'opacity-100' : 'opacity-70'}`}>Logs</span>
-               </button>
-            </div>
-         </div>
+                <button onClick={() => { setMobileTab('activity'); setSidebarTab('activity'); }} aria-label="Logs" className={`flex flex-col items-center justify-center w-16 gap-1 rounded-2xl transition-all duration-200 active:scale-95 cursor-pointer ${mobileTab === 'activity' && sidebarTab === 'activity' ? 'text-green-400 bg-green-500/10' : 'text-gray-500 hover:text-gray-300'}`}>
+                   <History size={20} strokeWidth={mobileTab === 'activity' && sidebarTab === 'activity' ? 2.5 : 2} />
+                   <span className="text-[9px] font-black uppercase tracking-widest">Logs</span>
+                </button>
+             </div>
+          </div>
 
-         <AnimatePresence>
-            {showPlayersOverlay && (
+          <MiniChat roomId={id} open={miniChatOpen} setOpen={setMiniChatOpen} unread={unreadChat} />
+
+          <AnimatePresence>
+             {showPlayersOverlay && (
                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-2xl p-4 md:p-8 flex flex-col items-center">
                   <div className="w-full max-w-7xl flex flex-col gap-6 h-full">
                      <div className="flex items-center justify-between">

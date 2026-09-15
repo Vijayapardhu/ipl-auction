@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Mic, MicOff, PhoneOff, Volume2, Loader2, Users, Repeat } from 'lucide-react';
+import { Mic, MicOff, PhoneOff, Volume2, Loader2, Users, Repeat, RefreshCw, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAuction } from '../contexts/AuctionContext';
 import { useVoice } from '../contexts/VoiceContext';
@@ -42,7 +42,7 @@ const VoiceChat = ({ roomId, onJoinedChange, compact }) => {
   const { team } = useAuction();
   const {
     supported, turnConfigured, joined, joining, activeRoomId,
-    muted, peers, connectedUids, error, joinVoice, leave, toggleMute,
+    muted, deviceMuted, peers, connectedUids, error, joinVoice, leave, toggleMute, reconnect,
   } = useVoice();
   const teamId = team?.teamId || team?.team || '';
   const joinArgs = {
@@ -138,6 +138,12 @@ const VoiceChat = ({ roomId, onJoinedChange, compact }) => {
     <div className={compact
       ? "shrink-0 flex flex-col p-3 gap-2.5"
       : "flex-1 flex flex-col min-h-0 p-3 sm:p-4 gap-3"}>
+      {deviceMuted && (
+        <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">
+          <AlertTriangle size={14} className="text-amber-400 shrink-0" />
+          <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest">Mic blocked by device — check system mute</span>
+        </div>
+      )}
       <div className="flex items-center gap-2.5 bg-white/[0.02] border border-white/5 rounded-2xl p-3">
         <button
           onClick={toggleMute}
@@ -154,6 +160,13 @@ const VoiceChat = ({ roomId, onJoinedChange, compact }) => {
           title="Leave voice"
         >
           <PhoneOff size={16} />
+        </button>
+        <button
+          onClick={reconnect}
+          className="h-12 w-10 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10 transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
+          title="Reconnect voice"
+        >
+          <RefreshCw size={14} />
         </button>
       </div>
 
