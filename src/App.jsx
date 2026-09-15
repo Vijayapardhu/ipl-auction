@@ -17,7 +17,7 @@ function App() {
       <QuotaProvider>
         <AuthProvider>
           <AuctionProvider>
-            <div className="min-h-screen bg-ipl-dark text-white">
+              <div className="min-h-dvh bg-ipl-dark text-white overflow-x-clip">
               <QuotaExceededModal />
               <Routes>
                 <Route path="/" element={<LandingPage />} />

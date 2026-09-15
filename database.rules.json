@@ -19,6 +19,11 @@
           // Any authenticated user can write/sync the room state
           ".write": "auth != null"
         },
+        "playerOrder": {
+          // Static randomized player order set at auction start, read by all clients
+          ".read": "auth != null",
+          ".write": "auth != null"
+        },
         "live": {
           // Any authenticated user can write/sync the live bidding state
           ".write": "auth != null"
@@ -41,6 +46,15 @@
             ".write": "auth != null && auth.uid == $userId"
           }
         }
+      }
+    },
+
+    "userSquads": {
+      // Legacy top-level path, read-only (old rooms stored squads here).
+      // FantasyDashboard migrates these into auctions/$roomId/userSquads on read.
+      "$auctionId": {
+        ".read": "auth != null",
+        ".write": false
       }
     }
   }

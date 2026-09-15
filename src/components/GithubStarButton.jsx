@@ -8,15 +8,17 @@ const GithubStarButton = () => {
   useEffect(() => {
     const fetchStars = async () => {
       try {
-        const response = await fetch('https://api.github.com/repos/Shaurya01836/ipl-auction');
+        const response = await fetch('https://api.github.com/users/Vijayapardhu/repos?per_page=100');
         const data = await response.json();
-        if (data.stargazers_count !== undefined) {
-          const count = data.stargazers_count;
+        if (Array.isArray(data)) {
+          const count = data.reduce((sum, repo) => sum + (repo.stargazers_count || 0), 0);
           if (count >= 1000) {
             setStars((count / 1000).toFixed(1) + 'K');
           } else {
             setStars(count.toString());
           }
+        } else {
+          setStars('0');
         }
       } catch (error) {
         console.error('Error fetching stars:', error);
@@ -30,7 +32,7 @@ const GithubStarButton = () => {
 
   return (
     <motion.a
-      href="https://github.com/Shaurya01836/ipl-auction"
+      href="https://github.com/Vijayapardhu"
       target="_blank"
       rel="noopener noreferrer"
       initial={{ opacity: 0, x: 20 }}

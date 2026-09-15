@@ -1,0 +1,158 @@
+// ===============================================================
+// Assumed Data Model (prototype - derived from src/ codebase scan)
+// ===============================================================
+//
+// Collection: auctions
+// Document ID: roomId / auctionId (string)
+// Fields:
+//   - status, currentPlayerIndex, settings, teams, etc.: mixed (required varies)
+//   - Reads: authenticated users (lobby + auction room need live reads)
+//   - Writes: authenticated users (auction engine does read-modify-write;
+//     prototype allows auth writes; harden with custom claims for admin/host)
+// 
+// Collection: teams
+// Document ID: auto-ID
+// Fields:
+//   - auctionId: string (required, immutable) - links team to auction
+//   - name, players, budget, etc.: mixed
+//   - Queries: where('auctionId', '==', auctionId)
+//   - Reads/writes: authenticated users in that auction
+//
+// Collection: players
+// Document ID: auto-ID or seed ID
+// Fields: seed data (name, role, basePrice, etc.)
+//   - Reads: authenticated users
+//   - Writes: authenticated (seed script); harden to admin-only
+//
+// Collection: fantasyConfig
+// Document IDs: playerPoints, playerMatches, playerStats
+// Fields: maps of player -> points/stats
+//   - Reads: authenticated users (fantasy dashboard)
+//   - Writes: admin only (prototype: authenticated; harden with admin claim)
+//
+// Collection: fantasySquads / userSquads
+// Document ID: auto-ID
+// Fields:
+//   - auctionId: string (required, immutable)
+//   - userId: string (required, immutable) - owner uid
+//   - squad: list (max 15) - player selections
+//   - Queries: where('auctionId', '==', auctionId)
+//   - Reads: authenticated; Writes: owner-only + validated
+//
+// ===============================================================
+
+// ===============================================================
+// Helper Functions
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string
+        && request.resource.data[field].size() >= minLen
+        && request.resource.data[field].size() <= maxLen;
+    }
+
+    function isValidList(list, maxSize) {
+      return list is list && list.size() <= maxSize;
+    }
+
+    // ===============================================================
+    // Domain Validators (CRITICAL: used in both create and update)
+    // ===============================================================
+
+    function isValidSquad(data) {
+      return hasRequiredFields(['auctionId', 'userId'])
+        && data.auctionId is string && data.auctionId.size() > 0 && data.auctionId.size() < 100
+        && data.userId is string && data.userId.size() > 0 && data.userId.size() < 128
+        && (!('squad' in data) || isValidList(data.squad, 15));
+    }
+
+    function squadOwnerUnchanged() {
+      return request.resource.data.userId == resource.data.userId
+        && request.resource.data.auctionId == resource.data.auctionId;
+    }
+
+    // ---- auctions: live auction rooms, authenticated read/write (prototype)
+    match /auctions/{auctionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // ---- teams: scoped by auctionId, authenticated access (prototype)
+    match /teams/{teamId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && hasRequiredFields(['auctionId'])
+        && request.resource.data.auctionId is string
+        && request.resource.data.auctionId.size() > 0;
+      allow update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // ---- players: seed data, authenticated read; writes authenticated (harden to admin)
+    match /players/{playerId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // ---- fantasyConfig: points/stats, authenticated read; writes authenticated (harden to admin)
+    match /fantasyConfig/{configId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated()
+        && configId in ['playerPoints', 'playerMatches', 'playerStats'];
+      allow delete: if false;
+    }
+
+    // ---- fantasySquads / userSquads: owner-only writes + validated
+    match /fantasySquads/{squadId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && isValidSquad(request.resource.data)
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated()
+        && isValidSquad(request.resource.data)
+        && squadOwnerUnchanged()
+        && resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /userSquads/{squadId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && isValidSquad(request.resource.data)
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated()
+        && isValidSquad(request.resource.data)
+        && squadOwnerUnchanged()
+        && resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    // ---- default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

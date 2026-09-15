@@ -125,7 +125,7 @@ ipl-auction/
 
 1. **Clone the Repository & Install Dependencies**
    ```bash
-   git clone https://github.com/Shaurya01836/ipl-auction.git
+    git clone https://github.com/Vijayapardhu/ipl-auction.git
    cd ipl-auction
    npm install
    ```

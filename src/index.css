@@ -170,6 +170,23 @@ button, .no-select {
   }
 }
 
+/* Prevent iOS Safari auto-zoom on focus (needs >= 16px) + safe-area helpers */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
 /* Mobile GPU Performance Enhancements (< 768px viewports) */
 @media (max-width: 767px) {
   .glass {

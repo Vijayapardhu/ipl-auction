@@ -26,19 +26,18 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import GithubStarButton from '../components/GithubStarButton';
-import BuyMeACoffee from '../components/BuyMeACoffee';
 import AuctionActivityFeed from '../components/AuctionActivityFeed';
 import Footer from '../components/Footer';
 
 const LogoMarquee = () => {
   const marqueeTeams = [...TEAMS, ...TEAMS]; // Double for seamless loop
   return (
-    <div className="relative overflow-hidden w-full py-12 select-none">
+    <div className="relative overflow-hidden w-full min-w-0 py-12 select-none">
       <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-[#050505] to-transparent z-10" />
       <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-[#050505] to-transparent z-10" />
 
       <motion.div
-        className="flex gap-12 items-center"
+        className="flex w-max min-w-0 gap-12 items-center"
         animate={{ x: [0, -1920] }}
         transition={{
           duration: 40,
@@ -276,10 +275,9 @@ const LandingPage = () => {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="relative min-h-screen bg-[#050505] flex flex-col items-center justify-center py-10 px-4 font-sans text-white overflow-x-hidden"
+      className="relative min-h-[100dvh] pt-safe pb-safe py-10 px-4 bg-[#050505] font-sans text-white overflow-x-hidden flex flex-col items-center justify-start"
       >
         <GithubStarButton />
-        <BuyMeACoffee />
 
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-orange-600/20 blur-[120px] rounded-full" />
@@ -299,10 +297,10 @@ const LandingPage = () => {
           className="text-center mb-4 z-10 relative max-w-3xl px-4"
         >
           <h1 className="sr-only">IPL Auction Simulator & Game - Live IPL Mega Auction 2026</h1>
-          <div className="text-3xl sm:text-4xl md:text-5xl lg:text-[64px] font-extrabold tracking-tighter leading-none bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60">
+          <div className="text-[clamp(1.75rem,8vw,2.5rem)] font-extrabold tracking-tighter break-words bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60">
             CREATE YOUR
           </div>
-          <div className="text-5xl sm:text-6xl md:text-7xl lg:text-[88px] font-black tracking-tighter text-[#ff5500] leading-none uppercase mt-1 italic drop-shadow-[0_4px_12px_rgba(255,85,0,0.2)]">
+          <div className="text-4xl sm:text-5xl md:text-6xl lg:text-[88px] font-black tracking-tighter break-words text-[#ff5500] leading-none uppercase mt-1 italic drop-shadow-[0_4px_12px_rgba(255,85,0,0.2)]">
             AUCTION ROOM
           </div>
 
@@ -335,12 +333,12 @@ const LandingPage = () => {
           <div className="absolute -inset-2 bg-gradient-to-r from-[#ff5500]/5 to-[#0088ff]/2 rounded-[2.5rem] blur-3xl opacity-40 pointer-events-none -z-10" />
           <div className="bg-[#0c0c0c] rounded-[2.2rem] border border-white/5 grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch divide-y lg:divide-y-0 lg:divide-x divide-white/5 overflow-hidden">
             {/* Left Side: Live Activity Feed */}
-            <div className="lg:col-span-7 w-full flex flex-col p-6 md:p-8 relative">
+            <div className="lg:col-span-7 w-full min-w-0 flex flex-col p-4 sm:p-6 md:p-8 relative">
               <AuctionActivityFeed />
             </div>
 
             {/* Right Side: Welcome Login Form */}
-            <div className="lg:col-span-5 w-full p-8 md:p-10 flex flex-col items-center justify-center">
+            <div className="lg:col-span-5 w-full min-w-0 p-4 sm:p-6 md:p-8 flex flex-col items-center justify-center">
               <h2 className="text-xl font-black uppercase tracking-tight mb-1">
                 {isGuestMode ? 'Guest Access' : 'Welcome, Manager'}
               </h2>
@@ -444,10 +442,9 @@ const LandingPage = () => {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="relative min-h-screen bg-[#050505] flex flex-col items-center justify-center py-10 px-4 font-sans text-white overflow-x-hidden"
+      className="relative min-h-[100dvh] pt-safe pb-safe py-10 px-4 bg-[#050505] font-sans text-white overflow-x-hidden flex flex-col items-center justify-start"
     >
       <GithubStarButton />
-      <BuyMeACoffee />
 
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-orange-600/20 blur-[120px] rounded-full" />
@@ -469,10 +466,10 @@ const LandingPage = () => {
         className="text-center mb-4 z-10 relative max-w-3xl px-4"
       >
         <h1 className="sr-only">IPL Auction Simulator & Game - Live IPL Mega Auction 2026</h1>
-        <div className="text-3xl sm:text-4xl md:text-5xl lg:text-[64px] font-extrabold tracking-tighter leading-none bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60">
+        <div className="text-[clamp(1.75rem,8vw,2.5rem)] font-extrabold tracking-tighter break-words bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60">
           CREATE YOUR
         </div>
-        <div className="text-5xl sm:text-6xl md:text-7xl lg:text-[88px] font-black tracking-tighter text-[#ff5500] leading-none uppercase mt-1 italic drop-shadow-[0_4px_12px_rgba(255,85,0,0.2)]">
+        <div className="text-4xl sm:text-5xl md:text-6xl lg:text-[88px] font-black tracking-tighter break-words text-[#ff5500] leading-none uppercase mt-1 italic drop-shadow-[0_4px_12px_rgba(255,85,0,0.2)]">
           AUCTION ROOM
         </div>
 
@@ -506,15 +503,15 @@ const LandingPage = () => {
         <div className="absolute -inset-2 bg-gradient-to-r from-[#ff5500]/5 to-[#0088ff]/2 rounded-[2.5rem] blur-3xl opacity-40 pointer-events-none -z-10" />
         <div className="bg-[#0c0c0c] rounded-[2.2rem] border border-white/5 grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch divide-y lg:divide-y-0 lg:divide-x divide-white/5 overflow-hidden">
           {/* Left Side: Live signings */}
-          <div className="lg:col-span-5 w-full flex flex-col p-6 md:p-8 relative">
+            <div className="lg:col-span-5 w-full min-w-0 flex flex-col p-4 sm:p-6 md:p-8 relative">
             <AuctionActivityFeed />
           </div>
 
           {/* Right Side: Create/Join/History form */}
-          <div className="lg:col-span-7 w-full p-6 md:p-8 flex flex-col">
+            <div className="lg:col-span-7 w-full min-w-0 p-4 sm:p-6 md:p-8 flex flex-col">
 
             {/* Flat Tab Bar Navigation: Create / Join / History */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-white/5 mb-8 gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 min-w-0 border-b border-white/5 mb-8">
               <div className="flex">
                 <button
                   type="button"
@@ -766,7 +763,7 @@ const LandingPage = () => {
                                 className={`w-full text-left p-3 sm:p-4 rounded-2xl border transition-all flex items-center justify-between group cursor-pointer ${isExpanded ? 'bg-white/10 border-white/20 shadow-lg' : 'bg-white/[0.03] border-white/5 hover:bg-white/5'
                                   }`}
                               >
-                                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                                   <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/5 border border-white/10 p-1 sm:p-1.5 flex items-center justify-center shrink-0">
                                     <img src={teamMeta?.logo} alt={`${teamMeta?.name || 'Team'} Logo`} className="w-full h-full object-contain" />
                                   </div>

@@ -19,7 +19,7 @@ export default function QuotaExceededModal() {
   if (!isQuotaExceeded) return null;
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/90 backdrop-blur-2xl animate-fade-in font-sans">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] bg-black/90 backdrop-blur-2xl animate-fade-in font-sans overflow-y-auto">
       {/* Background Ambient Glow matching Landing Page */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-[#ff5500]/20 blur-[120px] rounded-full" />
@@ -27,7 +27,7 @@ export default function QuotaExceededModal() {
       </div>
 
       {/* Outer Card Glass Frame matching Landing Page style */}
-      <div className="relative max-w-md w-full bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-3 backdrop-blur-3xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-10">
+      <div className="relative max-w-md w-full max-h-[100dvh] overflow-y-auto bg-white/[0.03] border border-white/10 rounded-3xl sm:rounded-[2.5rem] p-2 sm:p-3 backdrop-blur-3xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-10 my-auto">
         {/* Subtle Orange Glow behind panel */}
         <div className="absolute inset-0 bg-gradient-to-b from-[#ff5500]/[0.05] via-[#ff5500]/[0.02] to-transparent rounded-[2.5rem] blur-xl pointer-events-none -z-10" />
 

@@ -4,6 +4,8 @@ import { auth } from '../lib/firebase';
 import { 
   onAuthStateChanged, 
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   signOut,
   signInAnonymously,
@@ -22,6 +24,7 @@ const AuthContext = createContext({
 });
 
 const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -49,6 +52,9 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
+    // Complete a pending redirect sign-in (COOP-safe fallback for popup auth).
+    getRedirectResult(auth).catch(() => {});
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       const isLandingPage = typeof window !== 'undefined' && window.location.pathname === '/';
@@ -71,8 +77,24 @@ export const AuthProvider = ({ children }) => {
 
 
   const loginWithGoogle = async () => {
-    const result = await signInWithPopup(auth, googleProvider);
-    return result.user;
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      return result.user;
+    } catch (err) {
+      // COOP / popup-blocker environments: fall back to full-page redirect,
+      // which does not depend on window.closed polling or opener access.
+      if (
+        err?.code === 'auth/popup-blocked' ||
+        err?.code === 'auth/popup-closed-by-user' ||
+        err?.code === 'auth/cancelled-popup-request' ||
+        err?.code === 'auth/operation-not-supported-in-this-environment' ||
+        err?.code === 'auth/popup-redirect-mismatch'
+      ) {
+        await signInWithRedirect(auth, googleProvider);
+        return null; // page is redirecting to Google
+      }
+      throw err;
+    }
   };
   
   const loginAsGuest = async (displayName) => {

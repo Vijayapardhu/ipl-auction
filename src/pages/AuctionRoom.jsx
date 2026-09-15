@@ -153,10 +153,22 @@ const AuctionRoom = () => {
    }, [displayAuctionState?.playerId]);
 
    const [isTtsEnabled, setIsTtsEnabled] = useState(true);
-   const [ttsSpeed, setTtsSpeed] = useState(1.15); // configurable pace
-   const [ttsPitch, setTtsPitch] = useState(0.95); // configurable pitch
+   const [ttsSpeed, setTtsSpeed] = useState(1.0); // natural pace (was 1.15, sounded rushed)
+   const [ttsPitch, setTtsPitch] = useState(1.0); // natural pitch
    const [availableVoices, setAvailableVoices] = useState([]);
    const [selectedVoiceName, setSelectedVoiceName] = useState('');
+
+   // Live mirror of TTS settings for async speech callbacks (avoids stale closures)
+   const ttsSettingsRef = useRef({ rate: 1.0, pitch: 1.0, voiceName: '', enabled: true });
+   ttsSettingsRef.current = { rate: ttsSpeed, pitch: ttsPitch, voiceName: selectedVoiceName, enabled: isTtsEnabled };
+
+   // Smooth-speech engine refs: single-slot queue keeps announcements live
+   // without ever stacking up or clipping mid-word.
+   const speakQueueRef = useRef(null);
+   const isSpeakingRef = useRef(false);
+   const speakTimerRef = useRef(null);
+   const resumeTimerRef = useRef(null);
+   const warmedUpRef = useRef(false);
 
    const lastSpokenPlayerIdRef = useRef(null);
    const lastSpokenBidRef = useRef(0);
@@ -182,6 +194,9 @@ const AuctionRoom = () => {
    const getVoiceLabel = (name) => {
       const cleanName = name.toLowerCase();
       if (cleanName.includes("neerja")) return "Neerja (Authentic Indian Female)";
+      if (cleanName.includes("aria")) return "Aria (Natural)";
+      if (cleanName.includes("jenny")) return "Jenny (Natural Female)";
+      if (cleanName.includes("guy")) return "Guy (Natural Male)";
       if (cleanName.includes("rishi")) return "Rishi (Authentic Indian Male)";
       if (cleanName.includes("daniel")) return "Daniel (Classic UK Auctioneer)";
       if (cleanName.includes("david")) return "David (Professional Deep Male)";
@@ -203,17 +218,27 @@ const AuctionRoom = () => {
                "Google US English",
                "Google UK English Male",
                "Google UK English Female",
-               "Microsoft David",
+               "Microsoft Aria",
+               "Microsoft Jenny",
+               "Microsoft Guy",
                "Neerja",
-               "Daniel",
+               "Rishi",
+               "Natural",
+               "Online",
+               "Neural",
                "Samantha",
-               "Rishi"
+               "Daniel",
+               "Microsoft David"
             ];
 
             let filtered = voices.filter(v =>
                v.lang.startsWith('en') &&
                targetPatterns.some(pattern => v.name.toLowerCase().includes(pattern.toLowerCase()))
             );
+
+            // Prefer premium network (non-local) voices — these sound like real
+            // humans instead of robotic offline synthesis.
+            filtered.sort((a, b) => Number(a.localService) - Number(b.localService));
 
             // Deduplicate by display label, preferring "Online" or "Natural" high-quality voice versions
             const uniqueMap = new Map();
@@ -233,14 +258,18 @@ const AuctionRoom = () => {
             }
 
             setAvailableVoices(filtered);
+            warmUpVoiceEngine(); // prime the engine early for a smooth first announcement
 
-            // Set default selected voice
+            // Set default selected voice — prefer premium natural voices first
             if (!selectedVoiceName && filtered.length > 0) {
                const defaultVoice = filtered.find(v =>
+                  v.name.includes("Aria") ||
+                  v.name.includes("Jenny") ||
                   v.name.includes("Neerja") ||
-                  v.name.includes("Daniel") ||
+                  v.name.includes("Natural") ||
+                  v.name.includes("Online") ||
                   v.name.includes("Rishi") ||
-                  v.name.includes("David") ||
+                  v.name.includes("Daniel") ||
                   v.name.includes("Google US")
                ) || filtered[0];
 
@@ -257,21 +286,98 @@ const AuctionRoom = () => {
       }
    }, [selectedVoiceName]);
 
-   // Core Text-to-Speech call
-   const speak = (text) => {
-      if (!isTtsEnabled) return;
-      if ('speechSynthesis' in window) {
-         window.speechSynthesis.cancel(); // cancel any active or queued speech immediately
-         const utterance = new SpeechSynthesisUtterance(text);
-         const voices = window.speechSynthesis.getVoices();
+   // Warm-up: prime the speech engine once with a silent utterance so the
+   // first real announcement starts instantly instead of clipping (smooth start).
+   const warmUpVoiceEngine = () => {
+      if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+      if (warmedUpRef.current) return;
+      warmedUpRef.current = true;
+      try {
+         const warm = new SpeechSynthesisUtterance(' ');
+         warm.volume = 0;
+         warm.rate = 1;
+         window.speechSynthesis.speak(warm);
+      } catch (e) { /* engine unavailable — announcements stay silent */ }
+   };
 
-         const chosenVoice = voices.find(v => v.name === selectedVoiceName) || voices.find(v => v.lang.startsWith('en')) || voices[0];
-         if (chosenVoice) {
-            utterance.voice = chosenVoice;
+   const clearSpeakTimer = () => {
+      if (speakTimerRef.current) {
+         clearTimeout(speakTimerRef.current);
+         speakTimerRef.current = null;
+      }
+   };
+
+   // Play the next queued phrase when the current one ends (smooth handoff,
+   // tiny gap so phrases never collide or stack up).
+   const flushSpeakQueue = () => {
+      const next = speakQueueRef.current;
+      speakQueueRef.current = null;
+      if (!next || !ttsSettingsRef.current.enabled) return;
+      clearSpeakTimer();
+      speakTimerRef.current = setTimeout(() => playUtterance(next), 200);
+   };
+
+   const playUtterance = (text) => {
+      if (!('speechSynthesis' in window)) return;
+      const synth = window.speechSynthesis;
+      const { rate, pitch, voiceName } = ttsSettingsRef.current;
+      const utterance = new SpeechSynthesisUtterance(text);
+      const voices = synth.getVoices();
+      const chosenVoice = voices.find(v => v.name === voiceName)
+         || voices.filter(v => v.lang.startsWith('en')).sort((a, b) => Number(a.localService) - Number(b.localService))[0]
+         || voices[0];
+      if (chosenVoice) {
+         utterance.voice = chosenVoice;
+      }
+      utterance.rate = rate;
+      utterance.pitch = pitch;
+      utterance.volume = 1;
+      isSpeakingRef.current = true;
+      // Smooth end: when speech finishes (or errors), hand off to the queue
+      // instead of cutting off — the next phrase starts cleanly.
+      utterance.onend = () => {
+         isSpeakingRef.current = false;
+         flushSpeakQueue();
+      };
+      utterance.onerror = () => {
+         isSpeakingRef.current = false;
+         flushSpeakQueue();
+      };
+      synth.speak(utterance);
+   };
+
+   // Smooth Text-to-Speech call.
+   // - urgent=true (new player, sold/unsold): interrupt cleanly and start fresh.
+   // - urgent=false (bid updates): if the voice is busy, keep only the newest
+   //   phrase queued — announcements stay live without mid-word clipping.
+   const speak = (text, urgent = false) => {
+      if (!ttsSettingsRef.current.enabled) return;
+      if ('speechSynthesis' in window) {
+         const synth = window.speechSynthesis;
+         if (urgent) {
+            speakQueueRef.current = null;
+            clearSpeakTimer();
+            synth.cancel();
+            isSpeakingRef.current = false;
+            speakTimerRef.current = setTimeout(() => playUtterance(text), 150);
+            return;
          }
-         utterance.rate = ttsSpeed;
-         utterance.pitch = ttsPitch;
-         window.speechSynthesis.speak(utterance);
+         if (isSpeakingRef.current || synth.speaking || synth.pending) {
+            speakQueueRef.current = text;
+            return;
+         }
+         clearSpeakTimer();
+         synth.cancel();
+         speakTimerRef.current = setTimeout(() => playUtterance(text), 150);
+      }
+   };
+
+   const stopSpeech = () => {
+      speakQueueRef.current = null;
+      clearSpeakTimer();
+      isSpeakingRef.current = false;
+      if ('speechSynthesis' in window) {
+         window.speechSynthesis.cancel();
       }
    };
 
@@ -294,7 +400,7 @@ const AuctionRoom = () => {
             const pName = currentPlayer?.name || "Player";
             const pRole = currentPlayer?.role || "";
             const baseValStr = formatPriceForSpeech(currentPlayer?.basePrice || 0);
-            speak(`Now up for auction: ${pName}, a ${pRole}. Starting with a base price of ${baseValStr}. Do I see a bid?`);
+            speak(`Now, up for auction: ${pName}, ${pRole}. Base price, ${baseValStr}. Do I hear a bid?`, true);
          }
          // 2. A new bid is placed
          else if (currentBid > lastSpokenBidRef.current) {
@@ -303,10 +409,10 @@ const AuctionRoom = () => {
             const bidValStr = formatPriceForSpeech(currentBid);
 
             const bidPhrases = [
-               `We have ${bidValStr} from ${teamName}!`,
-               `Bid is ${bidValStr} with ${teamName}!`,
-               `${teamName} bids ${bidValStr}!`,
-               `${bidValStr} is bid by ${teamName}!`
+               `We have ${bidValStr}, from ${teamName}!`,
+               `The bid stands at ${bidValStr}, with ${teamName}.`,
+               `${teamName} bids ${bidValStr}.`,
+               `${bidValStr}, bid by ${teamName}.`
             ];
             const chosenPhrase = bidPhrases[Math.floor(Math.random() * bidPhrases.length)];
             speak(chosenPhrase);
@@ -315,19 +421,26 @@ const AuctionRoom = () => {
          lastSpokenStatusRef.current = 'sold';
          const teamName = TEAMS.find(t => t.id === highBidderTeamId)?.name || highBidderTeamId || "a franchise";
          const bidValStr = formatPriceForSpeech(currentBid);
-         speak(`Sold! ${currentPlayer?.name || "Player"} goes to ${teamName} for ${bidValStr}!`);
+         speak(`Sold! ${currentPlayer?.name || "Player"} goes to ${teamName}, for ${bidValStr}.`, true);
       } else if (status === 'unsold' && lastSpokenStatusRef.current !== 'unsold') {
          lastSpokenStatusRef.current = 'unsold';
-         speak(`${currentPlayer?.name || "Player"} is unsold.`);
+         speak(`${currentPlayer?.name || "Player"}, goes unsold.`, true);
       }
    }, [displayAuctionState?.playerId, displayAuctionState?.currentBid, displayAuctionState?.status, currentAuction?.status, isTtsEnabled, currentPlayer]);
 
-   // Cancel all TTS speech when room is unmounted (cleanup)
+   // Watchdog for the Chrome long-utterance pause bug + cleanup on unmount.
+   // (Chrome silently pauses speech synthesis; resume() keeps it flowing.)
    useEffect(() => {
+      resumeTimerRef.current = setInterval(() => {
+         try {
+            if (isSpeakingRef.current && 'speechSynthesis' in window && window.speechSynthesis.paused) {
+               window.speechSynthesis.resume();
+            }
+         } catch (e) { /* ignore */ }
+      }, 5000);
       return () => {
-         if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
-         }
+         if (resumeTimerRef.current) clearInterval(resumeTimerRef.current);
+         stopSpeech();
       };
    }, []);
 
@@ -715,8 +828,8 @@ const AuctionRoom = () => {
       const availableTeams = TEAMS.filter(t => !takenTeamIds.has(t.id));
 
       return (
-         <div className="h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-orange-500/10 blur-[120px] rounded-full" />
+         <div className="min-h-dvh bg-[#050505] text-white flex flex-col items-center justify-center p-4 sm:p-8 text-center relative overflow-hidden">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] sm:w-[600px] sm:h-[600px] bg-orange-500/10 blur-[120px] rounded-full" />
             <div className="relative z-10 flex flex-col items-center w-full max-w-2xl">
                {availableTeams.length > 0 ? (
                   <>
@@ -726,7 +839,7 @@ const AuctionRoom = () => {
                      <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-2">Claim Your Franchise</h2>
                      <p className="text-gray-400 text-sm font-medium leading-relaxed mb-8">The auction is live! Pick a team to jump straight in.</p>
 
-                     <div className="grid grid-cols-5 gap-3 md:gap-4 w-full max-w-xl">
+                     <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5 sm:gap-3 md:gap-4 w-full max-w-xl">
                         {TEAMS.map((t) => {
                            const isTaken = takenTeamIds.has(t.id);
                            const isJoining = joiningTeam === t.id;
@@ -736,7 +849,7 @@ const AuctionRoom = () => {
                                  key={t.id}
                                  onClick={() => !isTaken && handleQuickJoin(t)}
                                  disabled={isTaken || !!joiningTeam}
-                                 className={`relative group flex flex-col items-center justify-center p-3 md:p-4 rounded-2xl transition-all duration-300 border cursor-pointer ${isJoining
+                                 className={`relative group flex flex-col items-center justify-center p-3 md:p-4 rounded-2xl transition-all duration-300 border cursor-pointer min-h-[88px] ${isJoining
                                     ? 'border-yellow-400 bg-yellow-400/10 shadow-[0_0_25px_rgba(250,204,21,0.2)] scale-105'
                                     : isTaken
                                        ? 'border-white/5 opacity-25 grayscale cursor-not-allowed'
@@ -779,84 +892,88 @@ const AuctionRoom = () => {
    }
 
    return (
-      <div className="h-screen bg-[#0d0d0d] text-white font-sans flex flex-col items-center overflow-hidden">
+      <div className="h-dvh bg-[#0d0d0d] text-white font-sans flex flex-col items-center overflow-hidden">
 
-         <header className="w-full min-h-14 h-auto md:h-14 bg-black/40 backdrop-blur-md border-b border-white/5 flex flex-col md:flex-row items-center justify-between px-4 md:px-6 py-3 md:py-0 z-50 gap-4 md:gap-0">
-            <div className="flex items-center gap-3 md:gap-6">
-               <div className="flex items-center gap-1.5 sm:gap-3">
-                  <span className="text-gray-500 text-[9px] sm:text-[10px] font-black uppercase tracking-widest">ID:</span>
-                  <span className="text-white font-mono font-bold tracking-widest text-[11px] sm:text-sm">{id}</span>
+         <header className="w-full min-h-14 h-auto md:h-14 bg-black/40 backdrop-blur-md border-b border-white/5 flex flex-row items-center justify-between px-3 md:px-6 py-2 md:py-0 z-50 gap-2">
+            <div className="flex items-center gap-2 md:gap-6 min-w-0">
+               <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
+                  <span className="text-gray-500 text-[10px] font-black uppercase tracking-widest">ID:</span>
+                  <span className="text-white font-mono font-bold tracking-widest text-[11px] sm:text-sm truncate">{id}</span>
                </div>
-               <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full" title="Connected Users">
+               <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full shrink-0" title="Connected Users">
                   <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
                   <span className="text-[10px] font-black text-gray-300">{currentAuction?.players?.length || 1}/10</span>
                </div>
-               <div className="flex items-center gap-2 border-l border-white/10 pl-4 sm:pl-6 h-6">
-                  <button onClick={copyRoomId} className="p-1.5 bg-white/5 text-gray-400 rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
+               <div className="hidden min-[400px]:flex items-center gap-2 border-l border-white/10 pl-3 sm:pl-6 h-6 shrink-0">
+                  <button onClick={copyRoomId} aria-label="Copy room ID" className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center bg-white/5 text-gray-400 rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
                      {copied ? <CheckCircle2 size={14} className="text-green-500" /> : <Copy size={14} />}
                   </button>
                </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 shrink-0">
                {isAdmin && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                      {displayAuctionState?.status === 'paused' ? (
                         <button
                            onClick={() => resumeAuction(id)}
-                           className="flex items-center gap-1.5 sm:gap-2 bg-white/5 border border-white/10 px-2 sm:px-3 py-1.5 rounded-lg text-gray-300 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+                           aria-label="Resume auction"
+                           className="flex items-center justify-center gap-1.5 bg-white/5 border border-white/10 p-2.5 min-w-[44px] min-h-[44px] rounded-lg text-gray-300 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all cursor-pointer"
                         >
-                           <PlayCircle size={12} /> <span className="hidden sm:inline">Resume</span>
+                           <PlayCircle size={14} /> <span className="hidden lg:inline">Resume</span>
                         </button>
                      ) : (
                         <button
                            onClick={() => pauseAuction(id)}
-                           className="flex items-center gap-1.5 sm:gap-2 bg-white/5 border border-white/10 px-2 sm:px-3 py-1.5 rounded-lg text-gray-300 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+                           aria-label="Pause auction"
+                           className="flex items-center justify-center gap-1.5 bg-white/5 border border-white/10 p-2.5 min-w-[44px] min-h-[44px] rounded-lg text-gray-300 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all cursor-pointer"
                         >
-                           <Pause size={12} /> <span className="hidden sm:inline">Pause</span>
+                           <Pause size={14} /> <span className="hidden lg:inline">Pause</span>
                         </button>
                      )}
                      <button
                         onClick={() => endAuction(id)}
-                        className="flex items-center gap-1.5 sm:gap-2 bg-white/5 border border-white/10 px-2 sm:px-3 py-1.5 rounded-lg text-gray-300 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/20 transition-all cursor-pointer"
+                        aria-label="End auction"
+                        className="flex items-center justify-center gap-1.5 bg-white/5 border border-white/10 p-2.5 min-w-[44px] min-h-[44px] rounded-lg text-gray-300 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/20 transition-all cursor-pointer"
                      >
-                        <XCircle size={12} /> <span className="hidden sm:inline">End</span>
+                        <XCircle size={14} /> <span className="hidden lg:inline">End</span>
                      </button>
                      <button
                         onClick={() => setShowParticipantsOverlay(true)}
-                        className="flex items-center gap-1.5 sm:gap-2 bg-white/5 border border-white/10 px-2 sm:px-3 py-1.5 rounded-lg text-gray-300 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+                        aria-label="Participants"
+                        className="flex items-center justify-center gap-1.5 bg-white/5 border border-white/10 p-2.5 min-w-[44px] min-h-[44px] rounded-lg text-gray-300 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all cursor-pointer"
                      >
-                        <Users size={12} /> <span className="hidden sm:inline">Participants</span>
+                        <Users size={14} /> <span className="hidden lg:inline">Participants</span>
                      </button>
                   </div>
                )}
-               <div className="flex items-center gap-1.5 border-l border-white/10 pl-6 h-6">
+               <div className="flex items-center gap-1 border-l border-white/10 pl-2 h-6">
                   <button
                      onClick={() => {
                         const newTtsVal = !isTtsEnabled;
                         setIsTtsEnabled(newTtsVal);
                         if (!newTtsVal) {
-                           if ('speechSynthesis' in window) {
-                              window.speechSynthesis.cancel();
-                           }
+                           stopSpeech();
                         } else {
-                           speak("Voice Auctioneer enabled.");
+                           warmUpVoiceEngine();
+                           setTimeout(() => speak("Voice auctioneer, enabled.", true), 250);
                         }
                      }}
-                     className={`p-1.5 rounded-lg border transition-all cursor-pointer ${isTtsEnabled ? 'bg-white/10 border-white/20 text-white shadow-sm' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
+                     className={`p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg border transition-all cursor-pointer ${isTtsEnabled ? 'bg-white/10 border-white/20 text-white shadow-sm' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
                      title={isTtsEnabled ? "Mute Voice Auctioneer" : "Enable Voice Auctioneer"}
                   >
                      <Gavel size={16} />
                   </button>
                   <button
                      onClick={() => setShowSettings(!showSettings)}
-                     className={`p-1.5 rounded-lg border transition-all cursor-pointer ${showSettings ? 'bg-white/10 border-white/20 text-white shadow-sm' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
+                     aria-label="Settings"
+                     className={`p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg border transition-all cursor-pointer ${showSettings ? 'bg-white/10 border-white/20 text-white shadow-sm' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
                      title="Local & Room Settings"
                   >
                      <SettingsIcon size={16} />
                   </button>
-                  <button onClick={() => navigate('/')} className="p-1.5 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors cursor-pointer"><Home size={16} /></button>
-                  <button onClick={logout} className="p-1.5 hover:bg-red-500/20 rounded-lg text-gray-400 hover:text-red-400 cursor-pointer transition-colors" title="Logout"><LogOut size={16} /></button>
+                  <button onClick={() => navigate('/')} aria-label="Home" className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors cursor-pointer"><Home size={16} /></button>
+                  <button onClick={logout} aria-label="Logout" className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-red-500/20 rounded-lg text-gray-400 hover:text-red-400 cursor-pointer transition-colors" title="Logout"><LogOut size={16} /></button>
                </div>
             </div>
          </header>
@@ -986,7 +1103,7 @@ const AuctionRoom = () => {
                </div>
             </aside>
 
-            <div className={`${mobileTab === 'arena' ? 'flex' : 'hidden'} md:flex flex-col flex-1 h-full overflow-hidden`}>
+            <div className={`${mobileTab === 'arena' ? 'flex' : 'hidden'} flex flex-col flex-1 min-h-0 h-full overflow-hidden md:flex`}>
                {/* Center Fixed Header */}
                <div className="min-h-12 border-b border-white/5 bg-white/[0.01] flex items-center px-3 sm:px-6 md:px-8 w-full shrink-0 py-2 md:py-0">
                   <div className="w-full max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-2 md:gap-4">
@@ -1018,10 +1135,10 @@ const AuctionRoom = () => {
                               initial={{ opacity: 0, scale: 0.9, y: 20 }}
                               animate={{ opacity: 1, scale: 1, y: 0 }}
                               exit={{ opacity: 0, scale: 1.1 }}
-                              className={`w-full max-w-2xl mx-auto min-h-[400px] flex flex-col items-center justify-center rounded-[2.5rem] overflow-hidden relative shadow-[0_0_100px_rgba(0,0,0,0.5)] border border-white/20 ${displayAuctionState.status === 'sold' ? (TEAMS.find(t => t.id === displayAuctionState.highBidderTeamId)?.color || 'bg-green-500') : 'bg-red-950'}`}
-                           >
-                              {/* Confetti deleted for brevity during recovery */}
-                              <div className="flex flex-col items-center text-center z-10 px-8 py-10 w-full bg-gradient-to-b from-white/10 to-transparent">
+                               className={`w-full max-w-2xl mx-auto min-h-[320px] sm:min-h-[400px] flex flex-col items-center justify-center rounded-3xl sm:rounded-[2.5rem] overflow-hidden relative shadow-[0_0_100px_rgba(0,0,0,0.5)] border border-white/20 ${displayAuctionState.status === 'sold' ? (TEAMS.find(t => t.id === displayAuctionState.highBidderTeamId)?.color || 'bg-green-500') : 'bg-red-950'}`}
+                            >
+                               {/* Confetti deleted for brevity during recovery */}
+                               <div className="flex flex-col items-center text-center z-10 px-4 sm:px-8 py-8 sm:py-10 w-full bg-gradient-to-b from-white/10 to-transparent">
                                  <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }} className="relative mb-6">
                                     <img src={currentPlayer.image} alt={currentPlayer.name} className="w-32 h-32 md:w-36 md:h-40 object-cover rounded-3xl border-4 border-white/30 shadow-2xl relative z-10" />
                                  </motion.div>
@@ -1048,7 +1165,7 @@ const AuctionRoom = () => {
                            </motion.div>
                         ) : (
                            <motion.div key="player-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full flex-col gap-4 md:gap-6 flex">
-                              <div className="bg-gradient-to-b from-[#161616] to-[#0f0f0f] border border-white/[0.08] rounded-[2rem] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.6)] relative min-h-[400px]">
+                              <div className="bg-gradient-to-b from-[#161616] to-[#0f0f0f] border border-white/[0.08] rounded-3xl sm:rounded-[2rem] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.6)] relative">
                                  <div className="absolute top-0 inset-x-0 h-1 bg-white/5">
                                     <motion.div initial={{ width: "100%" }} animate={{ width: `${(timeLeft / (currentAuction?.settings?.bidTimer || 10)) * 100}%` }} className={`h-full transition-colors duration-1000 ${timeLeft < 5 ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]'}`} />
                                  </div>
@@ -1070,7 +1187,7 @@ const AuctionRoom = () => {
                                           {currentPlayer.stats?.sr !== undefined && (<div className="text-center border-l border-white/5"><span className="block text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">S.Rate</span><span className="text-lg sm:text-xl font-bold text-gray-100">{currentPlayer.stats.sr}</span></div>)}
                                           {currentPlayer.stats?.wickets !== undefined && (<div className="text-center border-l border-white/5"><span className="block text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Wkts</span><span className="text-lg sm:text-xl font-bold text-green-500">{currentPlayer.stats.wickets}</span></div>)}
                                        </div>
-                                       <div className="flex items-center justify-between mt-2 md:mt-4">
+                                       <div className="flex items-center justify-between flex-wrap gap-2 mt-2 md:mt-4">
                                           <div className="text-left">
                                              <span className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Current Bid</span>
                                              <div className="flex items-center gap-2 sm:gap-3">
@@ -1085,12 +1202,12 @@ const AuctionRoom = () => {
                                                 )}
                                              </div>
                                           </div>
-                                          <div className={`w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full flex flex-col items-center justify-center transition-all duration-300 border-2 ${timeLeft < 5
+                                          <div className={`w-14 h-14 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full flex flex-col items-center justify-center transition-all duration-300 border-2 shrink-0 ${timeLeft < 5
                                              ? 'border-red-500 bg-red-500/10 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.2)]'
                                              : 'border-green-500/30 bg-green-500/5 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.1)]'
                                              }`}>
-                                             <span className="text-base sm:text-lg md:text-xl font-black leading-none">{timeLeft}</span>
-                                             <span className="text-[6px] md:text-[7px] font-bold tracking-widest uppercase mt-0.5">Sec</span>
+                                             <span className="text-xl sm:text-lg md:text-xl font-black leading-none">{timeLeft}</span>
+                                             <span className="text-[8px] md:text-[7px] font-bold tracking-widest uppercase mt-0.5">Sec</span>
                                           </div>
                                        </div>
                                     </div>
@@ -1099,7 +1216,7 @@ const AuctionRoom = () => {
                                     <button
                                        onClick={handleBid}
                                        disabled={timeLeft === 0 || displayAuctionState?.status !== 'bidding' || displayAuctionState?.highBidderId === user?.uid}
-                                       className={`flex-1 h-12 sm:h-14 md:h-18 font-black text-sm sm:text-base md:text-xl rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:opacity-50 disabled:grayscale cursor-pointer ${displayAuctionState?.highBidderId === user?.uid
+                                       className={`flex-1 h-[52px] sm:h-14 md:h-18 font-black text-[15px] sm:text-base md:text-xl leading-tight px-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:opacity-50 disabled:grayscale cursor-pointer ${displayAuctionState?.highBidderId === user?.uid
                                           ? 'bg-white/5 text-green-500 border border-green-500/20 shadow-inner'
                                           : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-[#050505] shadow-[0_4px_20px_rgba(34,197,94,0.2)] hover:shadow-[0_8px_30px_rgba(34,197,94,0.3)]'
                                           }`}
@@ -1116,7 +1233,7 @@ const AuctionRoom = () => {
                </main>
             </div>
 
-            <aside className={`${mobileTab === 'activity' ? 'flex' : 'hidden'} md:flex w-full md:w-96 bg-black/40 border-l border-white/5 flex-col h-full md:max-h-[calc(100vh-3.5rem)]`}>
+            <aside className={`${mobileTab === 'activity' ? 'flex' : 'hidden'} flex w-full md:flex w-full md:w-96 bg-black/40 border-l border-white/5 flex-col h-full md:max-h-[calc(100vh-3.5rem)]`}>
                {/* Premium Tabs Header */}
                <div className="h-14 bg-white/[0.01] border-b border-white/5 flex items-center shrink-0 w-full">
                   <button
@@ -1251,26 +1368,26 @@ const AuctionRoom = () => {
 
          <div className="w-full shrink-0 bg-black/95 backdrop-blur-2xl border-t border-white/10 flex md:hidden z-50 pb-[max(0.75rem,env(safe-area-inset-bottom))] relative">
             <div className="flex w-full h-14 items-center justify-around px-4">
-               <button onClick={() => setMobileTab('squad')} className={`flex flex-col items-center justify-center w-16 gap-0.5 transition-all duration-300 ${mobileTab === 'squad' ? 'text-blue-500 translate-y-0' : 'text-gray-500 hover:text-gray-400 translate-y-0.5'}`}>
+               <button onClick={() => setMobileTab('squad')} aria-label="Squads" className={`flex flex-col items-center justify-center w-16 min-h-[56px] gap-0.5 transition-all duration-300 ${mobileTab === 'squad' ? 'text-blue-500 translate-y-0' : 'text-gray-500 hover:text-gray-400 translate-y-0.5'}`}>
                   <div className={`p-1 rounded-lg transition-colors duration-300 ${mobileTab === 'squad' ? 'bg-blue-500/10' : 'bg-transparent'}`}>
-                     <Users size={16} strokeWidth={mobileTab === 'squad' ? 2.5 : 2} />
+                     <Users size={18} strokeWidth={mobileTab === 'squad' ? 2.5 : 2} />
                   </div>
-                  <span className={`text-[7px] font-black uppercase tracking-widest ${mobileTab === 'squad' ? 'opacity-100' : 'opacity-70'}`}>Squads</span>
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${mobileTab === 'squad' ? 'opacity-100' : 'opacity-70'}`}>Squads</span>
                </button>
 
-               <button onClick={() => setMobileTab('arena')} className="flex flex-col items-center justify-center w-20 relative -mt-3 group z-10 transition-transform active:scale-95">
+               <button onClick={() => setMobileTab('arena')} aria-label="Arena" className="flex flex-col items-center justify-center w-20 min-h-[56px] relative group z-10 transition-transform active:scale-95">
                   <div className={`p-2.5 rounded-xl transition-all duration-500 border relative overflow-hidden ${mobileTab === 'arena' ? 'bg-yellow-500 text-black border-yellow-400 shadow-[0_6px_15px_rgba(234,179,8,0.4)] scale-105' : 'bg-[#151515] border-white/10 text-gray-400 shadow-lg'}`}>
                      {mobileTab === 'arena' && <div className="absolute inset-0 bg-white/20 blur-md pointer-events-none" />}
-                     <Gavel size={18} strokeWidth={2.5} className="relative z-10" />
+                     <Gavel size={20} strokeWidth={2.5} className="relative z-10" />
                   </div>
-                  <span className={`text-[8px] font-black uppercase tracking-[0.2em] transition-all mt-1 ${mobileTab === 'arena' ? 'text-yellow-500' : 'text-gray-500'}`}>Arena</span>
+                  <span className={`text-[10px] font-black uppercase tracking-[0.2em] transition-all mt-1 ${mobileTab === 'arena' ? 'text-yellow-500' : 'text-gray-500'}`}>Arena</span>
                </button>
 
-               <button onClick={() => setMobileTab('activity')} className={`flex flex-col items-center justify-center w-16 gap-0.5 transition-all duration-300 ${mobileTab === 'activity' ? 'text-green-500 translate-y-0' : 'text-gray-500 hover:text-gray-400 translate-y-0.5'}`}>
+               <button onClick={() => setMobileTab('activity')} aria-label="Logs" className={`flex flex-col items-center justify-center w-16 min-h-[56px] gap-0.5 transition-all duration-300 ${mobileTab === 'activity' ? 'text-green-500 translate-y-0' : 'text-gray-500 hover:text-gray-400 translate-y-0.5'}`}>
                   <div className={`p-1 rounded-lg transition-colors duration-300 ${mobileTab === 'activity' ? 'bg-green-500/10' : 'bg-transparent'}`}>
-                     <History size={16} strokeWidth={mobileTab === 'activity' ? 2.5 : 2} />
+                     <History size={18} strokeWidth={mobileTab === 'activity' ? 2.5 : 2} />
                   </div>
-                  <span className={`text-[7px] font-black uppercase tracking-widest ${mobileTab === 'activity' ? 'opacity-100' : 'opacity-70'}`}>Logs</span>
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${mobileTab === 'activity' ? 'opacity-100' : 'opacity-70'}`}>Logs</span>
                </button>
             </div>
          </div>
@@ -1283,7 +1400,7 @@ const AuctionRoom = () => {
                         <div className="flex items-center gap-4">
                            <div><h2 className="text-xl md:text-2xl font-black uppercase tracking-tight">Mega Auction Roster</h2><p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest leading-none">Complete Player Inventory</p></div>
                         </div>
-                        <button onClick={() => setShowPlayersOverlay(false)} className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-gray-400 hover:bg-red-500 hover:text-white transition-all"><X size={20} /></button>
+                        <button onClick={() => setShowPlayersOverlay(false)} aria-label="Close" className="w-11 h-11 min-w-[44px] min-h-[44px] shrink-0 bg-white/5 rounded-xl flex items-center justify-center text-gray-400 hover:bg-red-500 hover:text-white transition-all"><X size={20} /></button>
                      </div>
                      <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-white/5 no-scrollbar snap-x snap-mandatory shrink-0">
                         {['upcoming', 'sold', 'unsold', 'leaderboard'].map(tab => (
@@ -1438,18 +1555,9 @@ const AuctionRoom = () => {
                                     const newVoiceName = e.target.value;
                                     setSelectedVoiceName(newVoiceName);
 
-                                    // Brief preview of the selected voice
+                                    // Brief preview of the selected voice (smooth engine)
                                     setTimeout(() => {
-                                       if ('speechSynthesis' in window) {
-                                          window.speechSynthesis.cancel();
-                                          const previewUtterance = new SpeechSynthesisUtterance("Voice selected.");
-                                          const voices = window.speechSynthesis.getVoices();
-                                          const vMatch = voices.find(v => v.name === newVoiceName);
-                                          if (vMatch) previewUtterance.voice = vMatch;
-                                          previewUtterance.rate = ttsSpeed;
-                                          previewUtterance.pitch = ttsPitch;
-                                          window.speechSynthesis.speak(previewUtterance);
-                                       }
+                                       speak("Voice selected.", true);
                                     }, 100);
                                  }}
                                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-[10px] text-gray-300 font-semibold focus:outline-none focus:border-yellow-500/50 transition-colors"
