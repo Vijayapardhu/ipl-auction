@@ -45,6 +45,21 @@
             // Ensure that presence writes are strictly authorized to the user themselves
             ".write": "auth != null && auth.uid == $userId"
           }
+        },
+        "voice": {
+          "$userId": {
+            // Voice-chat roster: users may only publish their own entry
+            ".write": "auth != null && auth.uid == $userId"
+          }
+        },
+        "voice-signals": {
+          "$userId": {
+            // WebRTC signaling inbox: any authenticated peer may send an
+            // offer/answer/ICE candidate, but only from themselves
+            "$signalId": {
+              ".write": "auth != null && newData.child('from').val() === auth.uid"
+            }
+          }
         }
       }
     },

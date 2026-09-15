@@ -37,14 +37,16 @@ import {
    ChevronDown,
    Play,
    ShieldAlert,
-   Trophy,
-   Clock,
-   LogOut
-} from 'lucide-react';
+    Trophy,
+    Clock,
+    LogOut,
+    Mic
+ } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { TEAMS } from '../data/teams';
 import TextChat from '../components/TextChat';
+import VoiceChat from '../components/VoiceChat';
 import PageLoader from '../components/PageLoader';
 
 const AuctionRoom = () => {
@@ -80,7 +82,8 @@ const AuctionRoom = () => {
    const [showSettings, setShowSettings] = useState(false);
    const [summaryTab, setSummaryTab] = useState('squads'); // squads, leaderboard
    const [showParticipantsOverlay, setShowParticipantsOverlay] = useState(false);
-   const [sidebarTab, setSidebarTab] = useState('activity'); // activity or chat
+    const [sidebarTab, setSidebarTab] = useState('activity'); // activity, chat or voice
+    const [voiceJoined, setVoiceJoined] = useState(false);
    const audioRef = useRef(null);
    const celebrationAudioRef = useRef(null);
    const [newTimerValue, setNewTimerValue] = useState(currentAuction?.settings?.bidTimer || 10);
@@ -1387,16 +1390,31 @@ const AuctionRoom = () => {
                      <History size={14} />
                      <span className="text-[10px] uppercase tracking-widest">Live Activity</span>
                   </button>
-                  <button
-                     onClick={() => setSidebarTab('chat')}
-                     className={`h-full flex-1 flex items-center justify-center gap-2 transition-all cursor-pointer ${sidebarTab === 'chat'
-                        ? 'bg-white/[0.04] text-white border-b-2 border-white/60 font-black'
-                        : 'text-gray-500 hover:text-gray-400 hover:bg-white/[0.01] border-b-2 border-transparent font-bold'
-                        }`}
-                  >
-                     <MessageSquare size={14} />
-                     <span className="text-[10px] uppercase tracking-widest">Chat</span>
-                  </button>
+                   <button
+                      onClick={() => setSidebarTab('chat')}
+                      className={`h-full flex-1 flex items-center justify-center gap-2 transition-all cursor-pointer ${sidebarTab === 'chat'
+                         ? 'bg-white/[0.04] text-white border-b-2 border-white/60 font-black'
+                         : 'text-gray-500 hover:text-gray-400 hover:bg-white/[0.01] border-b-2 border-transparent font-bold'
+                         }`}
+                   >
+                      <MessageSquare size={14} />
+                      <span className="text-[10px] uppercase tracking-widest">Chat</span>
+                   </button>
+                   <button
+                      onClick={() => setSidebarTab('voice')}
+                      className={`h-full flex-1 flex items-center justify-center gap-2 transition-all cursor-pointer ${sidebarTab === 'voice'
+                         ? 'bg-white/[0.04] text-white border-b-2 border-white/60 font-black'
+                         : 'text-gray-500 hover:text-gray-400 hover:bg-white/[0.01] border-b-2 border-transparent font-bold'
+                         }`}
+                   >
+                      <span className="relative">
+                         <Mic size={14} className={voiceJoined ? 'text-green-400' : ''} />
+                         {voiceJoined && (
+                            <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                         )}
+                      </span>
+                      <span className="text-[10px] uppercase tracking-widest">Voice</span>
+                   </button>
                </div>
 
                {/* Tab Panels */}
@@ -1491,17 +1509,27 @@ const AuctionRoom = () => {
                               )}
                            </div>
                         </motion.div>
-                     ) : (
-                        <motion.div
-                           key="chat"
-                           initial={{ opacity: 0, y: 10 }}
-                           animate={{ opacity: 1, y: 0 }}
-                           exit={{ opacity: 0, y: -10 }}
-                           className="flex-1 flex flex-col min-h-0 h-full p-2"
-                        >
-                           <TextChat roomId={id} />
-                        </motion.div>
-                     )}
+                      ) : sidebarTab === 'chat' ? (
+                         <motion.div
+                            key="chat"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="flex-1 flex flex-col min-h-0 h-full p-2"
+                         >
+                            <TextChat roomId={id} />
+                         </motion.div>
+                      ) : (
+                         <motion.div
+                            key="voice"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="flex-1 flex flex-col min-h-0 h-full"
+                         >
+                            <VoiceChat roomId={id} onJoinedChange={setVoiceJoined} />
+                         </motion.div>
+                      )}
                   </AnimatePresence>
                </div>
             </aside>
