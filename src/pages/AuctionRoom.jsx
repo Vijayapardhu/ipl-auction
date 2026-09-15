@@ -51,6 +51,20 @@ import VoiceChat from '../components/VoiceChat';
 import AuctionMiniBar from '../components/AuctionMiniBar';
 import MiniChat from '../components/MiniChat';
 import ShareSheet from '../components/ShareSheet';
+
+// Team colorways shared by confetti cannons + the full-screen sold flash.
+const TEAM_FLASH_COLORS = {
+  'MI': ['#004BA0', '#FFFFFF', '#0080FF'],
+  'CSK': ['#FFFF00', '#0000FF', '#FDB913'],
+  'RCB': ['#EC1C24', '#2c30a7ff', '#FFD700'],
+  'KKR': ['#3A225D', '#B38B2D', '#D1AB3E'],
+  'DC': ['#000080', '#FF0000', '#0000CD'],
+  'PBKS': ['#ED1B24', '#FFFFFF', '#D71921'],
+  'RR': ['#EA1A85', '#004B8D', '#254AA5'],
+  'SRH': ['#FF8228', '#000000', '#F26522'],
+  'GT': ['#1B2133', '#C1AA77', '#0B132B'],
+  'LSG': ['#0057E7', '#D11D55', '#01153E']
+};
 import PageLoader from '../components/PageLoader';
 
 const AuctionRoom = () => {
@@ -773,6 +787,14 @@ const AuctionRoom = () => {
 
     const lastHandledSoundStatusRef = useRef(null);
 
+    // Haptics: hammer-hammer-SOLD buzz on sold, single tap on unsold.
+    // No-op on iOS (no vibration API) — guarded, never throws.
+    const buzz = (pattern) => {
+       try {
+          if (navigator.vibrate) navigator.vibrate(pattern);
+       } catch (e) { /* ignore */ }
+    };
+
     // Smooth celebration audio: ramped fades + generation tokens so rapid
     // sold → sold (or sold → unsold) transitions crossfade cleanly instead
     // of cutting, and a stale fade can never resurrect old audio.
@@ -851,20 +873,8 @@ const AuctionRoom = () => {
          if (lastHandledSoundStatusRef.current !== currentKey) {
             lastHandledSoundStatusRef.current = currentKey;
 
-            const teamId = displayAuctionState?.highBidderTeamId;
-            const colorMap = {
-               'MI': ['#004BA0', '#FFFFFF', '#0080FF'],
-               'CSK': ['#FFFF00', '#0000FF', '#FDB913'],
-               'RCB': ['#EC1C24', '#2c30a7ff', '#FFD700'],
-               'KKR': ['#3A225D', '#B38B2D', '#D1AB3E'],
-               'DC': ['#000080', '#FF0000', '#0000CD'],
-               'PBKS': ['#ED1B24', '#FFFFFF', '#D71921'],
-               'RR': ['#EA1A85', '#004B8D', '#254AA5'],
-               'SRH': ['#FF8228', '#000000', '#F26522'],
-               'GT': ['#1B2133', '#C1AA77', '#0B132B'],
-               'LSG': ['#0057E7', '#D11D55', '#01153E']
-            };
-             const colors = teamId && colorMap[teamId] ? colorMap[teamId] : ['#FFD700', '#FFA500', '#FF4500'];
+             const teamId = displayAuctionState?.highBidderTeamId;
+             const colors = teamId && TEAM_FLASH_COLORS[teamId] ? TEAM_FLASH_COLORS[teamId] : ['#FFD700', '#FFA500', '#FF4500'];
 
              // Confetti loads on demand (never in the initial bundle).
              // Skipped for reduced-motion users; thinned out on low-end
@@ -910,6 +920,7 @@ const AuctionRoom = () => {
              if (teamId && TEAM_SONGS[teamId.toLowerCase()]) {
                 playCelebration(TEAM_SONGS[teamId.toLowerCase()], { volume: 0.5, fadeInMs: 1800 });
              }
+             buzz([150, 80, 150, 80, 350]);
          }
       } else if (status === 'unsold') {
          const currentKey = `unsold_${displayAuctionState?.playerId}`;
@@ -917,6 +928,7 @@ const AuctionRoom = () => {
             lastHandledSoundStatusRef.current = currentKey;
 
             playCelebration(UNSOLD_SONG, { volume: 0.7, fadeInMs: 1200 });
+            buzz([120]);
          }
        } else {
           lastHandledSoundStatusRef.current = null;
@@ -1889,6 +1901,27 @@ const AuctionRoom = () => {
 
           <MiniChat roomId={id} open={miniChatOpen} setOpen={setMiniChatOpen} unread={unreadChat} hidden={sidebarTab === 'chat' && (isDesktop || mobileTab === 'activity')} />
 
+          {/* Full-screen sold flash: washes the arena in the buyer's colors */}
+          <AnimatePresence>
+             {displayAuctionState?.status === 'sold' && (() => {
+                const tid = displayAuctionState?.highBidderTeamId;
+                const c = (tid && TEAM_FLASH_COLORS[tid]) || ['#FFD700', '#FFA500', '#FF4500'];
+                return (
+                   <motion.div
+                      key={`soldflash-${displayAuctionState?.playerId}-${displayAuctionState?.currentBid}`}
+                      className="fixed inset-0 z-[70] pointer-events-none"
+                      style={{
+                         background: `radial-gradient(ellipse at 50% 45%, ${c[0]}66 0%, ${c[0]}33 45%, transparent 75%), linear-gradient(180deg, ${c[0]}26 0%, transparent 30%, transparent 70%, ${c[0]}26 100%)`,
+                      }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: [0, 1, 1, 0] }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 4.5, times: [0, 0.12, 0.7, 1], ease: 'easeInOut' }}
+                   />
+                );
+             })()}
+          </AnimatePresence>
+
           {showShare && (
             <ShareSheet
               roomId={id}
@@ -2127,19 +2160,22 @@ const SoldCard = ({ msg }) => {
           // Loaded on demand — html-to-image never ships in the main bundle.
           const { toPng } = await import('html-to-image');
           const dataUrl = await toPng(cardRef.current, { 
-            cacheBust: false, 
-            pixelRatio: 2, 
-            skipFonts: true,
-            imagePlaceholder: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
-         });
-         const link = document.createElement('a');
-         link.download = `${player.name}_Sold.png`;
-         link.href = dataUrl;
-         link.click();
-      } catch (err) {
-         console.error('Error saving image:', err);
-      }
-   };
+             cacheBust: false, 
+             pixelRatio: 2, 
+             skipFonts: true,
+             imagePlaceholder: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+          });
+          const link = document.createElement('a');
+          link.download = `${player.name}_Sold.png`;
+          link.href = dataUrl;
+          // Must be in the DOM — detached clicks are ignored on mobile browsers.
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+       } catch (err) {
+          console.error('Error saving image:', err);
+       }
+    };
 
     return (
        <div className="space-y-2 mb-4 sm:mb-6">

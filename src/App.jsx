@@ -6,7 +6,6 @@ import { AuctionProvider } from './contexts/AuctionContext'
 import { QuotaProvider } from './contexts/QuotaContext'
 import { VoiceProvider } from './contexts/VoiceContext'
 import QuotaExceededModal from './components/QuotaExceededModal'
-import VoiceFloatBar from './components/VoiceFloatBar'
 import ErrorBoundary from './components/ErrorBoundary'
 import './index.css'
 import LandingPage from './pages/LandingPage'
@@ -58,7 +57,6 @@ function App() {
               <MotionConfig reducedMotion="user">
               <div className="min-h-dvh bg-ipl-dark text-white overflow-x-clip">
               <QuotaExceededModal />
-              <VoiceFloatBar />
               <Suspense fallback={<RouteFallback />}>
               <ErrorBoundary>
               <Routes>

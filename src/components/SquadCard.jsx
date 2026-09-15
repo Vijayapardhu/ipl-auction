@@ -11,6 +11,8 @@ const ROLES = ['Batsman', 'Wicket-Keeper', 'All-Rounder', 'Bowler'];
 const SquadCard = ({ t, teamDoc, managerName, totalBudget }) => {
   const cardRef = useRef(null);
   const [sharing, setSharing] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [exportError, setExportError] = useState('');
 
   const squad = (teamDoc?.squad || []).map((s) => {
     const pid = typeof s === 'string' ? s : s.id;
@@ -29,24 +31,72 @@ const SquadCard = ({ t, teamDoc, managerName, totalBudget }) => {
 
   const renderPng = async () => {
     if (!cardRef.current) return null;
-    const { toPng } = await import('html-to-image');
-    return toPng(cardRef.current, {
-      cacheBust: false,
-      pixelRatio: 2,
-      skipFonts: true,
-      imagePlaceholder: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
-    });
+    // Inline every photo as a blob first: remote CDNs often block the
+    // CORS fetch html-to-image needs, which would otherwise blank images
+    // in the export. Blob URLs always inline cleanly.
+    const imgs = Array.from(cardRef.current.querySelectorAll('img'));
+    const originalSrcs = new Map();
+    const blobUrls = [];
+    await Promise.all(imgs.map(async (img) => {
+      const src = img.currentSrc || img.getAttribute('src') || '';
+      if (!src || src.startsWith('data:') || src.startsWith('blob:')) return;
+      originalSrcs.set(img, img.getAttribute('src'));
+      try {
+        const res = await fetch(src, { mode: 'cors' });
+        if (!res.ok) throw new Error('img fetch failed');
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        blobUrls.push(objectUrl);
+        img.setAttribute('src', objectUrl);
+      } catch (e) {
+        img.setAttribute(
+          'src',
+          'https://api.dicebear.com/7.x/initials/svg?seed=' + encodeURIComponent(img.alt || 'Player')
+        );
+      }
+    }));
+    await Promise.all(imgs.map((img) => {
+      try {
+        return img.decode ? img.decode().catch(() => {}) : Promise.resolve();
+      } catch (e) {
+        return Promise.resolve();
+      }
+    }));
+    try {
+      const { toPng } = await import('html-to-image');
+      return await toPng(cardRef.current, {
+        cacheBust: false,
+        pixelRatio: 2,
+        skipFonts: true,
+        imagePlaceholder: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+      });
+    } finally {
+      originalSrcs.forEach((src, img) => {
+        try { img.setAttribute('src', src); } catch (e) { /* ignore */ }
+      });
+      blobUrls.forEach((u) => { try { URL.revokeObjectURL(u); } catch (e) { /* ignore */ } });
+    }
   };
 
   const exportPng = async () => {
+    setExportError('');
+    setDownloading(true);
     try {
       const dataUrl = await renderPng();
-      if (!dataUrl) return;
+      if (!dataUrl) throw new Error('render failed');
       const link = document.createElement('a');
       link.download = `${t.name.replace(/\s+/g, '_')}_Squad.png`;
       link.href = dataUrl;
+      // Must be in the DOM — detached clicks are ignored on mobile browsers.
+      document.body.appendChild(link);
       link.click();
-    } catch (e) { /* export failed */ }
+      document.body.removeChild(link);
+    } catch (e) {
+      setExportError('Download failed — try Share Image instead');
+      setTimeout(() => setExportError(''), 3000);
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const shareImage = async () => {
@@ -80,7 +130,10 @@ const SquadCard = ({ t, teamDoc, managerName, totalBudget }) => {
             <img src={t.logo} alt="" className="w-full h-full object-contain" />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="text-lg sm:text-2xl font-black uppercase tracking-tight text-white truncate">{t.name}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg sm:text-2xl font-black uppercase tracking-tight text-white truncate">{t.name}</h3>
+              <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest bg-[#ff5500]/15 border border-[#ff5500]/30 text-[#ff5500] rounded-lg px-2 py-0.5 shrink-0">{t.id}</span>
+            </div>
             <p className="text-[9px] sm:text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] truncate">
               Managed by {managerName || 'N/A'} • {squad.length} players
             </p>
@@ -148,9 +201,10 @@ const SquadCard = ({ t, teamDoc, managerName, totalBudget }) => {
       <div className="flex flex-wrap items-center gap-2 mt-3">
         <button
           onClick={exportPng}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[9px] font-black uppercase tracking-widest text-gray-300 hover:text-white transition-all active:scale-95 cursor-pointer"
+          disabled={downloading}
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[9px] font-black uppercase tracking-widest text-gray-300 hover:text-white transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
         >
-          <Download size={12} /> Export PNG
+          {downloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />} {downloading ? 'Saving…' : 'Export PNG'}
         </button>
         <button
           onClick={shareImage}
@@ -160,6 +214,9 @@ const SquadCard = ({ t, teamDoc, managerName, totalBudget }) => {
           {sharing ? <Loader2 size={12} className="animate-spin" /> : <Share2 size={12} />} Share Image
         </button>
       </div>
+      {exportError && (
+        <p className="mt-2 text-[10px] text-red-400 font-bold">{exportError}</p>
+      )}
     </div>
   );
 };
