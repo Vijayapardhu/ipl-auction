@@ -18,7 +18,10 @@ import {
   Rocket,
   TrendingUp,
   Zap,
-  Star
+  Star,
+  Edit2,
+  Save,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -30,8 +33,8 @@ import PageLoader from '../components/PageLoader';
 
 const Lobby = () => {
   const { id } = useParams();
-  const { user, loginWithGoogle, loginAsGuest, logout, loading: authLoading } = useAuth();
-  const { joinAuction, currentAuction, kickPlayer, updatePlayerTeam, updateRoomSettings, startAuction, joinRoomDb } = useAuction();
+  const { user, loginWithGoogle, loginAsGuest, logout, loading: authLoading, updateDisplayName } = useAuth();
+  const { joinAuction, currentAuction, kickPlayer, updatePlayerTeam, updateRoomSettings, startAuction, joinRoomDb, updatePlayerName } = useAuction();
   const navigate = useNavigate();
   
   const [activeTab, setActiveTab] = useState('players');
@@ -42,6 +45,8 @@ const Lobby = () => {
   const [guestName, setGuestName] = useState('');
   const [isGuestMode, setIsGuestMode] = useState(false);
   const [banError, setBanError] = useState(null);
+  const [editingName, setEditingName] = useState(null);
+  const [editNameValue, setEditNameValue] = useState('');
 
   const isAdmin = currentAuction?.hostId === user?.uid;
   const players = currentAuction?.players || [];
@@ -163,6 +168,33 @@ const Lobby = () => {
     } finally {
       setIsUpdatingSettings(false);
     }
+  };
+
+  const handleEditName = (playerId, currentName) => {
+    setEditingName(playerId);
+    setEditNameValue(currentName);
+  };
+
+  const handleSaveName = async (playerId) => {
+    if (!editNameValue.trim()) return;
+    try {
+      // Update in RTDB (lobby)
+      if (id && currentAuction) {
+        await updatePlayerName(id, playerId, editNameValue.trim());
+      }
+      // Update in Firebase Auth (persists across sessions)
+      await updateDisplayName(editNameValue.trim());
+    } catch (error) {
+      // Error saving name
+    } finally {
+      setEditingName(null);
+      setEditNameValue('');
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingName(null);
+    setEditNameValue('');
   };
 
   // ─── Unauthenticated State: Show Login Gateway ───
@@ -587,11 +619,48 @@ const Lobby = () => {
                               )}
                             </div>
                             <div>
-                              <div className="flex items-center gap-2">
-                                <p className="font-black text-sm text-white uppercase tracking-tight">{player.name}</p>
-                                {player.isHost && <Crown size={14} className="text-yellow-500 fill-yellow-500 " />}
-                                {player.id === user?.uid && <span className="text-[8px] font-black bg-white/10 px-1.5 py-0.5 rounded text-gray-400">YOU</span>}
-                              </div>
+                              {editingName === player.id ? (
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    value={editNameValue}
+                                    onChange={(e) => setEditNameValue(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSaveName(player.id)}
+                                    className="bg-white/5 border border-orange-500/50 rounded-xl px-3 py-1.5 text-white font-black uppercase text-sm tracking-[0.2em] focus:outline-none w-40"
+                                    autoFocus
+                                    maxLength={20}
+                                  />
+                                  <button
+                                    onClick={() => handleSaveName(player.id)}
+                                    className="p-1.5 bg-orange-500 rounded-xl text-white hover:bg-orange-400 transition-colors"
+                                    title="Save"
+                                  >
+                                    <Save size={14} />
+                                  </button>
+                                  <button
+                                    onClick={handleCancelEdit}
+                                    className="p-1.5 bg-white/10 rounded-xl text-gray-400 hover:bg-white/20 hover:text-white transition-colors"
+                                    title="Cancel"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <p className="font-black text-sm text-white uppercase tracking-tight">{player.name}</p>
+                                  {player.isHost && <Crown size={14} className="text-yellow-500 fill-yellow-500 " />}
+                                  {player.id === user?.uid && <span className="text-[8px] font-black bg-white/10 px-1.5 py-0.5 rounded text-gray-400">YOU</span>}
+                                  {player.id === user?.uid && (
+                                    <button
+                                      onClick={() => handleEditName(player.id, player.name)}
+                                      className="p-1.5 text-gray-500 hover:text-orange-500 hover:bg-white/5 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                                      title="Edit name"
+                                    >
+                                      <Edit2 size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                               <p className="text-[9px] text-gray-500 font-bold uppercase tracking-[0.2em] mt-0.5">
                                 {playerTeam?.name || (player.team === '' ? 'CALIBRATING...' : player.team)}
                               </p>

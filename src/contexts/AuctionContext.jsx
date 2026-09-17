@@ -907,6 +907,18 @@ export const AuctionProvider = ({ children }) => {
     await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { settings });
   }, []);
 
+  const updatePlayerName = useCallback(async (roomId, userId, newName) => {
+    const rtdbRoomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
+    if (!rtdbRoomSnap.exists()) return;
+    
+    const data = rtdbRoomSnap.val();
+    
+    const updatedPlayers = (data.players || []).map(p => 
+      p.id === userId ? { ...p, name: newName } : p
+    );
+    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { players: updatedPlayers });
+  }, []);
+
   const pauseAuction = useCallback(async (roomId) => {
     if (!user || !currentAuction || currentAuction.hostId !== user.uid) return;
 
@@ -983,6 +995,7 @@ export const AuctionProvider = ({ children }) => {
     placeBid,
     updatePlayerTeam,
     updateRoomSettings,
+    updatePlayerName,
     startAuction,
     endPlayerAuction,
     advanceToNextPlayer,

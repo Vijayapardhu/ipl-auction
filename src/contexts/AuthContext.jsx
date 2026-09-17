@@ -20,7 +20,8 @@ const AuthContext = createContext({
   loading: true,
   loginWithGoogle: async () => {},
   loginAsGuest: async () => {},
-  logout: async () => {}
+  logout: async () => {},
+  updateDisplayName: async () => {}
 });
 
 const googleProvider = new GoogleAuthProvider();
@@ -106,12 +107,24 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => signOut(auth);
 
+  const updateDisplayName = async (newName) => {
+    if (!user) return;
+    try {
+      await updateProfile(user, { displayName: newName });
+      setUser({ ...user, displayName: newName });
+      return user;
+    } catch (err) {
+      throw err;
+    }
+  };
+
   const value = {
     user,
     loading,
     loginWithGoogle,
     loginAsGuest,
-    logout
+    logout,
+    updateDisplayName
   };
 
   return (
